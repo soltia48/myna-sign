@@ -186,7 +186,21 @@ export function VerdictGroups({
               {heading}
             </h3>
             {attributed.map(claimOf)}
-            {detached.length > 0 && (
+            {detached.length > 0 && attributed.length === 0 && (
+              /*
+                Nothing above to be told apart from, so the sentence stands on its own and the
+                group's own box does the framing. Drawing the container here would put a second
+                frame and a second heading around every child of the first, which reads as two
+                sections that turn out to hold one list.
+              */
+              <>
+                <h4 class="verdict-group-head detached-head">
+                  これらは署名と証明書についての事実で、この文書については何も示していません
+                </h4>
+                {detached.map(claimOf)}
+              </>
+            )}
+            {detached.length > 0 && attributed.length > 0 && (
               /*
                 The ticks inside stay ticks. The timestamp really did verify, and the chain really
                 did reach a root; rewriting them as question marks would be a second untruth told
@@ -243,6 +257,11 @@ function claimOf(line: ClaimLine, index: number) {
       {line.detail &&
         (badge ? (
           <strong class="badge-test">{line.detail}</strong>
+        ) : line.detailSummary ? (
+          <details class="claim-more">
+            <summary>{line.detailSummary}</summary>
+            <small class="chain">{line.detail}</small>
+          </details>
         ) : (
           <small class="chain">{line.detail}</small>
         ))}

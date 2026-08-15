@@ -167,6 +167,14 @@ export function PdfPlacement({
   const [loading, setLoading] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [live, setLive] = useState<{ page: number; box: Box } | null>(null);
+  /**
+   * How many pages have had their viewport worked out.
+   *
+   * The number itself is not read; changing it is what makes rendering look at `viewports` again
+   * after a page has been painted. It is not derived from `visible`, because a page becomes visible
+   * before it is painted and the viewport only exists once it has been.
+   */
+  const [, setPlotted] = useState(0);
 
   // Whatever will actually be drawn: the signer's image, or the panel this program generates.
   useEffect(() => {
@@ -296,6 +304,11 @@ export function PdfPlacement({
       if (drawnAt.current !== scale * zoom) return;
       const viewport = rendered.getViewport({ scale: scale * zoom });
       viewports.current.set(n, viewport);
+      // The rectangle's position on screen is derived from this viewport while rendering, and a
+      // `ref` filling up is not something rendering hears about. Without this the default placement
+      // is never drawn at all: the map is empty on the render that follows the page becoming
+      // visible, and nothing afterwards asks the question again.
+      setPlotted((count) => count + 1);
 
       // Draw at the device's pixel density but lay out at the viewport's size, so the page stays
       // sharp while one CSS pixel keeps meaning one viewport unit.

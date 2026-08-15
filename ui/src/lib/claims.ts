@@ -45,6 +45,15 @@ export interface ClaimLine {
   value: string;
   /** The qualification — what the claim does not cover, or why it is not better than it is. */
   detail?: string;
+  /**
+   * A label to fold `detail` behind on screen, for provenance nobody reads every time.
+   *
+   * Only for detail that answers "where did this come from", never for detail that qualifies the
+   * claim: a reservation the reader has to open is a reservation most readers never see, which is
+   * the failure §7.4 is about. The written report ignores this and prints the detail either way —
+   * a file has no fold, and the person reading one is looking for exactly this kind of thing.
+   */
+  detailSummary?: string;
 }
 
 // --- The pieces shared by both kinds of signature ------------------------------------------------
@@ -88,9 +97,13 @@ export function timestampClaim(
     tone: "ok",
     label: "タイムスタンプ",
     value: formatJst(timestamp.genTime),
+    // Who signed the token and what it chains to. It is long — a responder DN and a root name on
+    // one line — and it qualifies nothing: the claim is the time, and the tick already says the
+    // chain was checked. Folded, so that the moment being asserted is what the eye lands on.
     detail: timestamp.tsaName
       ? `応答者: ${timestamp.tsaName} / ルート: ${anchor}`
       : `ルート: ${anchor}`,
+    detailSummary: "応答者とルート",
   };
 }
 

@@ -585,6 +585,13 @@ progress {
   color: var(--muted);
 }
 
+/* The same sentence when it qualifies a whole group and needs no box of its own. It keeps the
+   quieter colour so it still reads as a qualification rather than as a second group heading. */
+.detached-head {
+  color: var(--muted);
+  margin-top: var(--sp-3);
+}
+
 .badge-test,
 .planned-badge {
   display: inline-block;
@@ -614,15 +621,45 @@ progress {
   font-size: var(--fs-sm);
 }
 
+/* Provenance a reader asks for now and then, kept out of the way of the claim itself. Only ever
+   wraps detail that says where something came from — never a reservation, which has to be read
+   without being asked for. */
+/* `list-item` is the default and is kept on purpose: the disclosure triangle is the only thing
+   that says this line opens, and `inline-block` silently removes it. `fit-content` keeps the
+   target from spanning the column, and the height is held at the 24px a pointer needs. */
+.claim-more > summary {
+  display: list-item;
+  list-style-position: inside;
+  width: fit-content;
+  min-height: 24px;
+  padding-block: 2px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.claim-more > summary:hover {
+  color: var(--text);
+}
+
+.claim-more[open] > summary {
+  margin-bottom: 2px;
+}
+
+/* `minmax(0, ...)` rather than a bare `9em`: the last rows of a certificate are extensions listed
+   by OID, and `1.2.392.200149.8.5.5.1` is wider than the column. A grid track sized to a length
+   does not shrink and its content does not wrap, so the label ran under the value beside it. */
 .holder {
   display: grid;
-  grid-template-columns: 9em 1fr;
+  grid-template-columns: minmax(0, 9em) minmax(0, 1fr);
   gap: var(--sp-1) var(--sp-3);
   margin: var(--sp-3) 0 0;
 }
 
 .holder dt {
   color: var(--muted);
+  /* An OID has no spaces to break at, so it is allowed to break anywhere. */
+  overflow-wrap: anywhere;
 }
 
 .holder dd {
@@ -715,17 +752,67 @@ progress {
   z-index: 20;
 }
 
+/* A column with one scrolling part, rather than a box that scrolls as a whole.
+   At 860×600 — the smallest window this application allows — the file list and the disclosure
+   together are taller than the dialog can be, and focusing the password field scrolled the box far
+   enough that the title and "以下に電子署名します。" left the screen entirely. That sentence is the
+   dialog's whole job (§9.3), so the parts that name what is being signed and what it will cost are
+   held still and only the middle moves. */
 .dialog {
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border-radius: var(--r-md);
   padding: var(--sp-5);
   width: min(520px, 100%);
   max-height: 90vh;
-  overflow: auto;
+  overflow: hidden;
+}
+
+.dialog form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  /* Without this a flex child refuses to shrink below its content, and the scroller never scrolls. */
+  min-height: 0;
 }
 
 .dialog h2 {
   margin-top: 0;
+  flex: none;
+}
+
+.dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Room for the scrollbar, reserved whether or not one is showing, so that a list growing past
+     the box does not shove the text sideways. Pulling the box wider with a negative margin would
+     do the same job and overflow the form by the scrollbar's width. */
+  scrollbar-gutter: stable;
+}
+
+/* At 600px tall — the shortest window allowed — the file list and the disclosure do not both fit,
+   and what falls below the edge is the sentence about the public key carrying the holder's name.
+   Overlay scrollbars appear only while scrolling, so the box would otherwise end on a cut line
+   that reads as the end of the text. A sticky strip inside the scroller keeps a soft edge there
+   instead: the one place a reader looks to decide whether there is more. */
+.dialog-body::after {
+  content: "";
+  display: block;
+  position: sticky;
+  bottom: 0;
+  height: var(--sp-4);
+  margin-top: calc(var(--sp-4) * -1);
+  background: linear-gradient(transparent, var(--surface));
+  pointer-events: none;
+}
+
+.dialog-foot {
+  flex: none;
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-2);
+  margin-top: var(--sp-3);
 }
 
 .subject {

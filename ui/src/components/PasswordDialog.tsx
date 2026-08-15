@@ -317,6 +317,9 @@ export function PasswordDialog({
         <form onSubmit={submit}>
           <h2 id="pw-title">署名用パスワード</h2>
 
+          {/* The only part that scrolls. Everything outside it — the title, the field, the attempt
+              count, the buttons — stays where it is at any window size the application allows. */}
+          <div class="dialog-body">
           <section class="subject">
             <p class="subject-lead" id="pw-subject-lead">
               以下に電子署名します。
@@ -353,6 +356,7 @@ export function PasswordDialog({
               </Fragment>
             ))}
           </dl>
+          </div>
 
           {/* The toggle stays on the input's line, and outside the label: below it, it would cost
               the vertical room the attempt count needs; inside it, its text would become part of
@@ -370,9 +374,6 @@ export function PasswordDialog({
                 autocapitalize="off"
                 spellcheck={false}
                 value={password}
-                // Roughly the height of the pinned row below, so that scrolling this field into
-                // view never parks it behind that row.
-                style={{ scrollMarginBottom: "9em" }}
                 // Read-only rather than disabled while the card is being asked: a disabled field
                 // drops focus to the document body, and the focus put back after a wrong password
                 // then lands nowhere.
@@ -400,24 +401,9 @@ export function PasswordDialog({
             </button>
           </div>
 
-          {/* Pinned to the bottom of the dialog. At the smallest window this app allows, a long
-              file list and the disclosure together are taller than the dialog can be, and what
-              scrolled away first was the attempts left and the last-attempt question — the two
-              sentences that exist to stop the fifth mistake. They stay put; the rest scrolls. */}
-          <div
-            style={{
-              position: "sticky",
-              bottom: 0,
-              background: "var(--surface)",
-              borderTop: "1px solid var(--border)",
-              paddingTop: "var(--sp-2)",
-              // A pinned row stops at the scroller's content edge, and the dialog's own bottom
-              // padding keeps scrolling below it, so the list can be seen sliding through that
-              // strip. The shadow is that strip, painted in the dialog's own colour; anything the
-              // strip does not need is clipped away by the dialog.
-              boxShadow: "0 var(--sp-6) 0 var(--surface)",
-            }}
-          >
+          {/* Outside the scrolling part, so the attempts left and the last-attempt question — the
+              two sentences that exist to stop the fifth mistake — cannot be scrolled away. */}
+          <div class="dialog-foot">
             {/* Both regions are always here, empty or not. A live region added to the page at the
                 same moment as its text is announced by nothing. */}
             <p
