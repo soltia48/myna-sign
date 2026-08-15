@@ -29,7 +29,7 @@ rsa = "0.9"
 # These are already in the tree via sequoia's RustCrypto backend, so they cost nothing new.
 p256 = "0.13"
 p384 = "0.13"
-p521 = "0.13"
+p521 = "0.14"
 signature = "2"
 zeroize = { version = "1.9", features = ["zeroize_derive"] }
 serde = { version = "1", features = ["derive"] }
