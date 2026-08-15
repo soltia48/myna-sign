@@ -27,6 +27,26 @@ fn have(program: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Run `gpg` against a throwaway home directory, so this never touches the user's keyring.
+///
+/// Everything is named relative to `dir`, and `dir` is where the process runs. That is not tidiness:
+/// the `gpg` on a Windows runner is the MSYS build that Git for Windows carries, and it decides
+/// whether a path is absolute by POSIX rules. Handed `C:\Users\...` for `--homedir` it sees no
+/// leading `/`, calls it relative, and joins it onto its own working directory — which is how the
+/// keyring ends up at `/d/a/myna-sign/myna-sign/crates/myna-sign-core/C:\Users\...`, no key can be
+/// imported, and every verification fails for a reason that has nothing to do with the signature.
+/// A `.` means the same thing to both builds.
+fn gpg_in(dir: &TempDir, args: &[&str]) -> std::process::Output {
+    Command::new("gpg")
+        .current_dir(dir.path())
+        .arg("--homedir")
+        .arg(".")
+        .arg("--batch")
+        .args(args)
+        .output()
+        .expect("gpg failed to start")
+}
+
 /// A directory that goes away when the test does.
 struct TempDir(PathBuf);
 
@@ -92,29 +112,14 @@ fn gpg_verifies_a_detached_signature_we_made() {
     .unwrap();
     std::fs::write(dir.join("document.txt.asc"), &signature.armored).unwrap();
 
-    // A throwaway home directory, so this never touches the user's keyring.
-    let gpg = |args: &[&str]| {
-        Command::new("gpg")
-            .arg("--homedir")
-            .arg(dir.path())
-            .arg("--batch")
-            .args(args)
-            .output()
-            .expect("gpg failed to start")
-    };
-
-    let imported = gpg(&["--import", dir.join("public.asc").to_str().unwrap()]);
+    let imported = gpg_in(&dir, &["--import", "public.asc"]);
     assert!(
         imported.status.success(),
         "gpg would not import the key we exported:\n{}",
         String::from_utf8_lossy(&imported.stderr)
     );
 
-    let verified = gpg(&[
-        "--verify",
-        dir.join("document.txt.asc").to_str().unwrap(),
-        document.to_str().unwrap(),
-    ]);
+    let verified = gpg_in(&dir, &["--verify", "document.txt.asc", "document.txt"]);
     let stderr = String::from_utf8_lossy(&verified.stderr);
     assert!(
         verified.status.success(),
@@ -154,25 +159,27 @@ fn gpg_rejects_a_signature_over_a_document_that_changed() {
     // Change the document after signing.
     std::fs::write(&document, b"tampered\n").unwrap();
 
-    let gpg = |args: &[&str]| {
-        Command::new("gpg")
-            .arg("--homedir")
-            .arg(dir.path())
-            .arg("--batch")
-            .args(args)
-            .output()
-            .expect("gpg failed to start")
-    };
-    gpg(&["--import", dir.join("public.asc").to_str().unwrap()]);
+    // Checked rather than discarded: an import that failed leaves gpg with no key, and then the
+    // verification below fails for that reason instead of the one under test.
+    let imported = gpg_in(&dir, &["--import", "public.asc"]);
+    assert!(
+        imported.status.success(),
+        "gpg would not import the key we exported:\n{}",
+        String::from_utf8_lossy(&imported.stderr)
+    );
 
-    let verified = gpg(&[
-        "--verify",
-        dir.join("document.txt.asc").to_str().unwrap(),
-        document.to_str().unwrap(),
-    ]);
+    let verified = gpg_in(&dir, &["--verify", "document.txt.asc", "document.txt"]);
+    // Not just a non-zero exit: gpg exits non-zero for a missing key, an unreadable file and a
+    // dozen other things that are not "this signature does not match". On the Windows runner it
+    // was doing exactly that, and this test passed for months without checking a signature.
+    let stderr = String::from_utf8_lossy(&verified.stderr);
     assert!(
         !verified.status.success(),
-        "gpg accepted a signature over a document that changed"
+        "gpg accepted a signature over a document that changed:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("BAD signature"),
+        "gpg rejected the signature, but not for the reason under test:\n{stderr}"
     );
 }
 
@@ -542,18 +549,16 @@ fn gpg_verifies_a_cleartext_signature() {
     let path = dir.join("message.asc");
     std::fs::write(&path, &signed.armored).unwrap();
 
-    let gpg = |args: &[&str]| {
-        Command::new("gpg")
-            .arg("--homedir")
-            .arg(dir.path())
-            .arg("--batch")
-            .args(args)
-            .output()
-            .expect("gpg failed to start")
-    };
-    gpg(&["--import", dir.join("public.asc").to_str().unwrap()]);
+    // Checked rather than discarded: an import that failed leaves gpg with no key, and then the
+    // verification below fails for that reason instead of the one under test.
+    let imported = gpg_in(&dir, &["--import", "public.asc"]);
+    assert!(
+        imported.status.success(),
+        "gpg would not import the key we exported:\n{}",
+        String::from_utf8_lossy(&imported.stderr)
+    );
 
-    let verified = gpg(&["--verify", path.to_str().unwrap()]);
+    let verified = gpg_in(&dir, &["--verify", "message.asc"]);
     let stderr = String::from_utf8_lossy(&verified.stderr);
     assert!(
         verified.status.success() && stderr.contains("Good signature"),
