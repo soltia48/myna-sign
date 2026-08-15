@@ -47,7 +47,11 @@ pub use roots::{ChainOutcome, TrustAnchors};
 /// `rootPem`. Combined with `serde(default)` below, that means a trust anchor someone pasted in
 /// would be dropped in silence and the authority checked against the Mozilla list instead.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum TsaConfig {
     /// Do not timestamp. The default: nothing leaves the machine unless it was asked for.
     #[default]
