@@ -2898,7 +2898,7 @@ dependencies = [
  "rsa",
  "sequoia-openpgp",
  "serde",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "signature 2.2.0",
  "spki 0.7.3",
  "thiserror 2.0.20",

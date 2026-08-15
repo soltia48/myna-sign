@@ -23,7 +23,7 @@ myna-card = { version = "2.0", default-features = false }
 pcsc = "2.9"
 
 thiserror = "2"
-sha2 = "0.10"
+sha2 = "0.11"
 rsa = "0.9"
 # Verification meets algorithms the card never produces: a real FreeTSA token is ECDSA on P-384.
 # These are already in the tree via sequoia's RustCrypto backend, so they cost nothing new.
