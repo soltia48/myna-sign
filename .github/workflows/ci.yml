@@ -23,6 +23,53 @@ env:
 # part of the cache key.
 
 jobs:
+  config:
+    name: Repository configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: PyYAML
+        run: python3 -c "import yaml" 2>/dev/null || pip install --quiet pyyaml
+
+      # Dependabot answers a config it will not read by opening no pull requests, which looks
+      # exactly like having nothing to update — so a broken file is quiet for a month. These two
+      # checks are the mistakes already made here: an alias, and a top-level key of our own.
+      - name: dependabot.yml is one Dependabot will read
+        run: |
+          python3 - <<'PY'
+          import sys, yaml
+          text = open(".github/dependabot.yml").read()
+          if [t for t in yaml.scan(text) if isinstance(t, yaml.tokens.AliasToken)]:
+              sys.exit("::error::dependabot.yml uses a YAML alias, and Dependabot rejects the "
+                       "whole file for it: 'YAML aliases are not supported'")
+          config = yaml.safe_load(text)
+          unknown = sorted(set(config) - {"version", "updates", "registries",
+                                          "enable-beta-ecosystems"})
+          if unknown:
+              sys.exit(f"::error::dependabot.yml has top-level keys Dependabot does not take: {unknown}")
+          print(f"dependabot.yml parses, no aliases, {len(config['updates'])} update entries")
+          PY
+
+      # The two cargo entries ignore the same six crates, because a bump that only reaches
+      # `src-tauri/Cargo.lock` is still proposed against the root manifest. With aliases out, the
+      # list is written twice, and two copies of anything drift unless something notices.
+      - name: The two cargo ignore lists agree
+        run: |
+          python3 - <<'PY'
+          import sys, yaml
+          config = yaml.safe_load(open(".github/dependabot.yml"))
+          lists = {u["directory"]: u.get("ignore", [])
+                   for u in config["updates"] if u["package-ecosystem"] == "cargo"}
+          if sorted(lists) != ["/", "/src-tauri"]:
+              sys.exit(f"::error::expected cargo entries for / and /src-tauri, found {sorted(lists)}")
+          if lists["/"] != lists["/src-tauri"]:
+              sys.exit("::error::the two cargo ignore lists have drifted; they cover the same "
+                       "crates and Dependabot has no way to share one between directories")
+          print(f"the two cargo ignore lists agree ({len(lists['/'])} entries)")
+          PY
+
   lint:
     name: Format, lints and docs
     runs-on: ubuntu-latest

@@ -1,33 +1,5 @@
 version: 2
 
-# The RustCrypto generation this project is pinned to, and why it cannot move a crate at a time.
-#
-# `cms` 0.2 and `x509-tsp` 0.1 are the newest releases of either, and both are built on `der` 0.7
-# and `x509-cert` 0.2. Everything below is in that same world by necessity — see the comment above
-# `[workspace.dependencies]` in Cargo.toml and DESIGN.md §3.1. Taking any one of them to the new
-# generation on its own does not produce a version conflict, it produces a type error: 107 of them
-# for `x509-cert` alone, 174 for `der`.
-#
-# Note the update types. These are 0.x crates, so `0.7 -> 0.8` leaves the major at zero and
-# Dependabot calls it a *minor* update; blocking only `semver-major` would let every one of them
-# through. `signature` is past 1.0 and is the one that means what it says.
-#
-# Remove this block when `cms` and `x509-tsp` publish against `der` 0.8, and take the whole set in
-# one change. Until then a proposal here is a red build, monthly.
-x-rustcrypto-generation: &rustcrypto-generation
-  - dependency-name: der
-    update-types: [version-update:semver-minor, version-update:semver-major]
-  - dependency-name: spki
-    update-types: [version-update:semver-minor, version-update:semver-major]
-  - dependency-name: x509-cert
-    update-types: [version-update:semver-minor, version-update:semver-major]
-  - dependency-name: sha2
-    update-types: [version-update:semver-minor, version-update:semver-major]
-  - dependency-name: p521
-    update-types: [version-update:semver-minor, version-update:semver-major]
-  - dependency-name: signature
-    update-types: [version-update:semver-major]
-
 updates:
   - package-ecosystem: github-actions
     directory: /
@@ -48,7 +20,40 @@ updates:
     groups:
       patch-and-minor:
         update-types: [minor, patch]
-    ignore: *rustcrypto-generation
+
+    # The RustCrypto generation this project is pinned to, and why it cannot move a crate at a time.
+    #
+    # `cms` 0.2 and `x509-tsp` 0.1 are the newest releases of either, and both are built on `der`
+    # 0.7 and `x509-cert` 0.2. Everything below is in that same world by necessity — see the
+    # comment above `[workspace.dependencies]` in Cargo.toml and DESIGN.md §3.1. Taking any one of
+    # them to the new generation on its own does not produce a version conflict, it produces a type
+    # error: 107 of them for `x509-cert` alone, 174 for `der`.
+    #
+    # Note the update types. These are 0.x crates, so `0.7 -> 0.8` leaves the major at zero and
+    # Dependabot calls it a *minor* update; blocking only `semver-major` would let every one of
+    # them through. `signature` is past 1.0 and is the one that means what it says. Patch updates
+    # are left alone, because for a 0.x crate that is the whole of what stays inside the
+    # generation.
+    #
+    # This list is written out again under /src-tauri, and has to be. Dependabot does not accept
+    # YAML anchors — "YAML aliases are not supported" — so the two copies are the only way to say
+    # it once per directory. `dependabot-ignore-lists-agree` in CI is what stops them drifting.
+    #
+    # Delete both copies when `cms` and `x509-tsp` publish against `der` 0.8, and take the whole
+    # set in one change. Until then a proposal here is a red build, monthly.
+    ignore:
+      - dependency-name: der
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: spki
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: x509-cert
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: sha2
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: p521
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: signature
+        update-types: [version-update:semver-major]
 
   # The application is a separate workspace with its own lockfile, so it needs its own entry: an
   # update to the root does not reach it, and `tauri`, `tauri-build` and `tauri-plugin-dialog` are
@@ -69,7 +74,21 @@ updates:
     groups:
       patch-and-minor:
         update-types: [minor, patch]
-    ignore: *rustcrypto-generation
+
+    # Kept identical to the list under `/` above, where the reasoning is. Change one, change both.
+    ignore:
+      - dependency-name: der
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: spki
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: x509-cert
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: sha2
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: p521
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: signature
+        update-types: [version-update:semver-major]
 
   # The front end. `pdfjs-dist` renders the page a signature is placed on, and a placement drawn
   # against a viewport that changed is a signature somewhere other than where it was drawn — so
