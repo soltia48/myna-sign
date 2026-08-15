@@ -60,8 +60,10 @@
   --sp-5: 24px;
   --sp-6: 48px;
 
-  /* Roughly the height of the sticky tab strip, so that anything focused or jumped to does not
-     land underneath it. */
+  /* Roughly the height of the tab strip, so that anything focused or jumped to does not land
+     underneath it. An approximation on purpose: `scroll-padding-top` takes a length, and the
+     strip also carries the message banner, whose height depends on what it is saying. Erring
+     shallow costs a little scrolling; there is no value that is right in both cases. */
   --tabs-height: 68px;
 
   /* Drawn on the page image, which is white paper in both themes, so these do not follow the
@@ -174,15 +176,30 @@ button.ghost:focus-visible,
 
 /* --- Navigation --- */
 
+/* The tabs and whatever the last action had to say travel together. A banner that scrolls away
+   while the buttons that produced it stay put is a message about nothing on screen; sticking the
+   wrapper rather than the nav keeps the offset out of this file, since the strip is only ever as
+   tall as the font makes it. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+}
+
 .tabs {
   display: flex;
   gap: var(--sp-1);
-  position: sticky;
-  top: 0;
   padding: var(--sp-3) 0;
-  background: var(--bg);
   border-bottom: 1px solid var(--border);
-  z-index: 5;
+}
+
+/* Says a run is still going after the user has left the screen that started it. Deliberately
+   still: a blinking tab is a thing the eye cannot put down, and this can last a minute. */
+.tab-busy {
+  margin-left: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--muted);
 }
 
 .tab {

@@ -19,6 +19,7 @@
  * left. They say it in the same words, from the helpers below, because two wordings for one fact
  * read as two different problems.
  */
+import { Fragment } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { signal } from "@preact/signals";
 import { listen } from "@tauri-apps/api/event";
@@ -32,6 +33,8 @@ import {
   describeSex,
   describeSubstitutes,
   formatJst,
+  LABELS,
+  PIN_BLOCKED,
   type CertificateInfo,
   type PdfSignatureVerification,
   type PendingAction,
@@ -116,9 +119,6 @@ const signRequested = signal(0);
  */
 const signDiscarded = signal(0);
 
-const PASSWORD_LOCKED =
-  "署名用パスワードはロックされています。市区町村の窓口でのみ解除できます。";
-
 const NO_SIGN_CERTIFICATE =
   "このカードには署名用電子証明書がありません（15 歳未満などでは発行されません）。このカードでは署名できません。";
 
@@ -137,7 +137,7 @@ function retriesTone(retries: number | null): Tone {
 
 function retriesSummary(retries: number | null): string {
   if (retries === null) return "残り回数を確認できませんでした";
-  if (retries === 0) return "ロック済み";
+  if (retries === 0) return PIN_BLOCKED.claim;
   return `残り ${retries} 回`;
 }
 
@@ -152,7 +152,7 @@ function retriesConsequence(retries: number | null): string {
   if (retries === null) {
     return "すでに何回間違えているか分かりません。続けて間違えるとロックされます。";
   }
-  if (retries === 0) return PASSWORD_LOCKED;
+  if (retries === 0) return PIN_BLOCKED.sentence;
   return `あと ${retries} 回続けて間違えるとロックされ、市区町村の窓口でしか解除できません。`;
 }
 
@@ -180,9 +180,12 @@ async function connectCard(reader: string | null) {
 /**
  * Drop the session and cut power to the card.
  *
- * The message says what is known — the entered password is not held anywhere — and stops short of
- * saying the signing key is locked again, which §10.2 lists as unmeasured on all three systems.
- * "ロック" is kept for one meaning only: five wrong attempts and a trip to the town hall.
+ * The message claims only what this side can see: the power-down was sent, no password is held here,
+ * and the next signature will ask for one again. What the card did with its own security status is
+ * §10.2's unmeasured question, so the message says that is unknown rather than picking the reassuring
+ * answer — including in the older phrasing "the key is not unlocked", which asserted the same thing
+ * from the other direction. "ロック" is kept for one meaning only: five wrong attempts and a trip to
+ * the town hall.
  */
 async function disconnectCard() {
   cardBusy.value = true;
@@ -191,7 +194,7 @@ async function disconnectCard() {
     clearCard();
     notify(
       "info",
-      "カードの電源を落としました。パスワードを入力済みの状態はカードに残っていません。次に署名するときは、もう一度パスワードの入力が必要です。確実を期すなら、カードをリーダーから取り外してください。",
+      "カードの電源を落とし、このアプリはパスワードを保持していません。次に署名するときは、もう一度パスワードの入力が必要です。カード内部の状態まで消えたかどうかは、このアプリからは確認できません。確実を期すなら、カードをリーダーから取り外してください。",
     );
   } catch (e) {
     notify("error", describe(asAppError(e)));
@@ -272,7 +275,7 @@ export function CardScreen() {
           </Claim>
           {/* The state word is left to `Claim`, which takes it from the same table the exported
               text file labels its lines with. A second copy here is a second thing to keep true. */}
-          <Claim label="トークン" tone={status.physicalCard ? "ok" : "warn"}>
+          <Claim label={LABELS.token} tone={status.physicalCard ? "ok" : "warn"}>
             {status.tokenType}
             {status.physicalCard ? "（マイナンバーカード）" : "（スマホ用電子証明書）"}
           </Claim>
@@ -326,7 +329,7 @@ function CertificateTable({ certificate }: { certificate: CertificateInfo }) {
       </p>
     )}
     <dl class="holder">
-      <dt>主体者</dt>
+      <dt>{LABELS.subject}</dt>
       <dd>{certificate.subject}</dd>
       {h.name && (
         <>
@@ -364,11 +367,13 @@ function CertificateTable({ certificate }: { certificate: CertificateInfo }) {
       <dd>
         <code>{certificate.fingerprint}</code>
       </dd>
+      {/* Keyed on the fragment, not on the pair inside it: a key on a child of an unkeyed
+          fragment is a key within a list of one, which reconciles nothing. */}
       {h.other.map(([oid, value]) => (
-        <>
-          <dt key={`dt-${oid}`}>{oid}</dt>
-          <dd key={`dd-${oid}`}>{value}</dd>
-        </>
+        <Fragment key={oid}>
+          <dt>{oid}</dt>
+          <dd>{value}</dd>
+        </Fragment>
       ))}
     </dl>
     </>
@@ -411,6 +416,11 @@ const clipboardAvailable =
 
 export function SignScreen() {
   const [subjects, setSubjects] = useState<SigningSubject[] | null>(null);
+  // What the card answered when asked just before this confirmation, which is not the same thing as
+  // the last number anybody has. A card that declines to say leaves `cardStatus` holding the figure
+  // from connection time, and handing that to the dialog would let it decide there is nothing to
+  // warn about on the strength of a number this attempt has no evidence for.
+  const [askedRetries, setAskedRetries] = useState<number | null>(null);
   const [planned, setPlanned] = useState<PlannedOutput[]>([]);
   // Chosen before the password, and read again after it. A ref rather than state because nothing on
   // screen depends on it and it must not be a render behind when the dialog reports success.
@@ -435,6 +445,11 @@ export function SignScreen() {
   );
   const blockedByWrite = signPendingBlocked.value.filter(
     (item) => item.blockedBy.kind === "write",
+  );
+  // Stopping is not failing. These get their own panel because every sentence in the other two is
+  // about something having gone wrong, and none of it is true here.
+  const cancelled = signPendingBlocked.value.filter(
+    (item) => item.blockedBy.kind === "cancelled",
   );
 
   function setOptions(patch: Partial<typeof pdfOptions.value>) {
@@ -581,9 +596,12 @@ export function SignScreen() {
   }
 
   /** Fold a run's outcome into what the screen shows. */
-  function absorb(outcome: SignOutcome) {
+  async function absorb(outcome: SignOutcome) {
     signResults.value = outcome.written;
-    signPendingBlocked.value = outcome.pending;
+    // `outcome.pending` is only what *this* run held back, and the queue belongs to Rust: a run
+    // that succeeds after an earlier one was blocked would otherwise drop the earlier signatures
+    // off the screen, leaving them unretriable and undiscardable while Rust still holds them.
+    signPendingBlocked.value = await api.listPending().catch(() => outcome.pending);
     signingFailure.value = outcome.signingError;
     signSideOutputs.value = outcome.sideOutputs;
     signRequested.value = outcome.requested;
@@ -727,10 +745,11 @@ export function SignScreen() {
       }
       setSignPinRetries(observed);
       if (observed === 0) {
-        notify("error", PASSWORD_LOCKED);
+        notify("error", PIN_BLOCKED.sentence);
         return;
       }
 
+      setAskedRetries(observed);
       setSubjects(gathered);
     } catch (e) {
       notify("error", describe(asAppError(e)));
@@ -759,7 +778,7 @@ export function SignScreen() {
           notify("error", "保存先が決まっていません。もう一度「署名する」を押してください。");
           return;
         }
-        absorb(
+        await absorb(
           await api.signPdf({
             path: files[0],
             output,
@@ -777,7 +796,7 @@ export function SignScreen() {
           }),
         );
       } else {
-        absorb(
+        await absorb(
           await api.signFiles({
             paths: files,
             embedCertificate: embedCertificate.value,
@@ -858,7 +877,7 @@ export function SignScreen() {
         </div>
       ) : retries === 0 ? (
         <div class="status-block">
-          <p>{PASSWORD_LOCKED}</p>
+          <p>{PIN_BLOCKED.sentence}</p>
         </div>
       ) : (
         <div class="status-block">
@@ -1134,7 +1153,9 @@ export function SignScreen() {
               page={options.page}
               rect={options.rect}
               provisional={!options.placed}
-              onChange={(page, rect) => setOptions({ page, rect, placed: true })}
+              onChange={(page, rect, chosen = true) =>
+                setOptions({ page, rect, placed: chosen })
+              }
             />
           )}
           <p class="note">
@@ -1212,6 +1233,16 @@ export function SignScreen() {
         />
       )}
 
+      {cancelled.length > 0 && (
+        <PendingPanel
+          items={cancelled}
+          kind="cancelled"
+          busy={busy}
+          onDecide={decide}
+          onWriteElsewhere={writeElsewhere}
+        />
+      )}
+
       {total > 0 && (
         <div class="panel">
           <h2>
@@ -1252,7 +1283,7 @@ export function SignScreen() {
       {subjects && (
         <PasswordDialog
           subjects={subjects}
-          retries={retries}
+          retries={askedRetries}
           disclosure={disclosure}
           tsaDestination={tsaDestination(tsa.value)}
           onUnlocked={afterUnlock}
@@ -1279,20 +1310,26 @@ function PendingPanel({
   onWriteElsewhere,
 }: {
   items: PendingInfo[];
-  kind: "timestamp" | "write";
+  kind: "timestamp" | "write" | "cancelled";
   busy: boolean;
   onDecide: (items: PendingInfo[], action: PendingAction) => void;
   onWriteElsewhere: (items: PendingInfo[]) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const reasons = [...new Set(items.map((item) => item.blockedBy.message))];
+  const reasons = [
+    ...new Set(
+      items.map((item) => ("message" in item.blockedBy ? item.blockedBy.message : "")),
+    ),
+  ].filter((reason) => reason !== "");
 
   return (
     <div class="panel">
       <h2>
         {kind === "timestamp"
           ? "タイムスタンプを取得できませんでした"
-          : "署名を書き出せませんでした"}
+          : kind === "write"
+            ? "署名を書き出せませんでした"
+            : "タイムスタンプの取得を中止しました"}
       </h2>
       {kind === "timestamp" ? (
         <p class="warn-box">
@@ -1300,10 +1337,16 @@ function PendingPanel({
           まだファイルに書き出していないだけなので、失われていません。
           再試行してもカードの操作もパスワードの再入力も不要です。
         </p>
-      ) : (
+      ) : kind === "write" ? (
         <p class="warn-box">
           <strong>署名そのものは問題なく作成済みです。</strong>
           書き出し先に問題があります: {reasons.join(" / ")}
+        </p>
+      ) : (
+        <p class="warn-box">
+          <strong>署名そのものは作成済みです。</strong>
+          中止したのはタイムスタンプの取得だけで、署名は失われていません。
+          再試行してもカードの操作もパスワードの再入力も不要です。
         </p>
       )}
       <ul class="planned">
@@ -1321,7 +1364,9 @@ function PendingPanel({
                 <code>{basename(item.source)}</code>
                 {" → "}
                 <code>{basename(item.output)}</code>
-                <small class="chain">{item.blockedBy.message}</small>
+                {"message" in item.blockedBy && (
+                  <small class="chain">{item.blockedBy.message}</small>
+                )}
               </div>
             )}
           </li>
@@ -1331,7 +1376,7 @@ function PendingPanel({
         <button onClick={() => onDecide(items, "retry")} disabled={busy}>
           再試行
         </button>
-        {kind === "timestamp" ? (
+        {kind !== "write" ? (
           <button
             class="ghost"
             onClick={() => onDecide(items, "writeWithoutTimestamp")}

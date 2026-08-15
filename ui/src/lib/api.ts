@@ -266,7 +266,9 @@ export interface SignResult {
  */
 export type Blocker =
   | { kind: "timestamp"; message: string }
-  | { kind: "write"; message: string };
+  | { kind: "write"; message: string }
+  /** The user stopped the wait. Nothing failed, and the screen must not say it did. */
+  | { kind: "cancelled" };
 
 /**
  * The file the card refused, and why.

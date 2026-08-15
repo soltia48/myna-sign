@@ -34,7 +34,11 @@ use tauri::Manager;
 /// signing operation — the signature exists — so it is reported as the [`Blocker`] on the signature
 /// that is waiting on a decision.
 #[derive(Debug, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum AppError {
     /// No card, no reader, or the card refused.
     Card {
@@ -389,7 +393,11 @@ struct Pending {
 /// directory that would not take a file are different problems with different answers, and a run
 /// that funnelled them into one string could only ever report whichever happened first.
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum Blocker {
     /// The authority did not answer, or its token did not verify.
     Timestamp {
@@ -401,6 +409,10 @@ pub enum Blocker {
         /// What happened, as the interface will show it.
         message: String,
     },
+    /// The user stopped the wait. Its own variant rather than a `Timestamp` carrying different
+    /// prose: nothing failed, and a screen that has to tell "stopped" from "could not" by reading
+    /// the sentence is the same collapse this type was split up to undo.
+    Cancelled,
 }
 
 impl Blocker {
@@ -682,14 +694,7 @@ fn settle(
         // anyway: holding it back would deny a signature for a reason the user did not give. And
         // what is held back was stopped, not failed — the wording has to say so.
         if timestamping && state.is_cancelled() {
-            hold(
-                state,
-                outcome,
-                item,
-                Blocker::Timestamp {
-                    message: "取得を中止しました。".into(),
-                },
-            );
+            hold(state, outcome, item, Blocker::Cancelled);
             continue;
         }
         // "タイムスタンプ取得中" would be a lie for an item with no authority to ask.
@@ -895,7 +900,11 @@ async fn sign_files(
                     let error = AppError::from(e);
                     let removed =
                         matches!(error, AppError::Card { .. }) && !still_answering(session);
-                    let error = if removed { AppError::CardRemoved } else { error };
+                    let error = if removed {
+                        AppError::CardRemoved
+                    } else {
+                        error
+                    };
                     return Ok(Made {
                         items,
                         failure: Some(SigningFailure {
@@ -1085,9 +1094,9 @@ async fn sign_pdf(
             .as_ref()
             .and_then(|a| a.image_path.as_ref())
         {
-            Some(path) => {
-                pdf::SignatureImage::from_bytes(std::fs::read(path).map_err(|e| read_error(path, e))?)
-            }
+            Some(path) => pdf::SignatureImage::from_bytes(
+                std::fs::read(path).map_err(|e| read_error(path, e))?,
+            ),
             None => signature_panel(
                 &state,
                 request.reason.as_deref(),

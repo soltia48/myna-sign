@@ -60,7 +60,10 @@ interface Props {
   /// Shown dashed and labelled, so that "where it will land" and "where I put it" do not look the
   /// same — the first is a suggestion the signer may not have noticed.
   provisional: boolean;
-  onChange: (page: number, rect: Rect) => void;
+  /// `chosen` is false when the rectangle is the signing path's own default rather than a
+  /// placement. Without it, "back to the default" would immediately count as a choice and the
+  /// dashed outline the signer needs to recognise would disappear at the moment it became true.
+  onChange: (page: number, rect: Rect, chosen?: boolean) => void;
 }
 
 /** The width a page is drawn at when nothing can be measured yet, in CSS pixels. */
@@ -510,7 +513,7 @@ export function PdfPlacement({
         panel?.reason ?? null,
         panel?.location ?? null,
       );
-      onChange(placement.page, placement.rect);
+      onChange(placement.page, placement.rect, false);
       moveFocus(placement.page);
     } catch {
       notify("error", "既定の署名位置を取得できませんでした。ドラッグで指定してください。");
