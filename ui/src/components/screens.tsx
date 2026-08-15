@@ -194,7 +194,7 @@ async function disconnectCard() {
     clearCard();
     notify(
       "info",
-      "カードの電源を落とし、このアプリはパスワードを保持していません。次に署名するときは、もう一度パスワードの入力が必要です。カード内部の状態まで消えたかどうかは、このアプリからは確認できません。確実を期すなら、カードをリーダーから取り外してください。",
+      "カードの電源を落としました。パスワードは本アプリに残っていません。次に署名するときは、もう一度入力が必要です。カード内部の状態までは確認できないため、確実を期すならリーダーから取り外してください。",
     );
   } catch (e) {
     notify("error", describe(asAppError(e)));
@@ -241,8 +241,7 @@ export function CardScreen() {
       </div>
 
       <p class="note">
-        接続時に読み出すのは利用者証明用電子証明書だけです。署名用電子証明書（氏名・住所・生年月日・性別）は、
-        署名するときにパスワードを入力するまで読み出しません。
+        接続時に読み出すのは利用者証明用電子証明書だけです。署名用電子証明書（氏名・住所・生年月日・性別）は、署名するときにパスワードを入力するまで読み出しません。
       </p>
 
       {readers !== null && readers.length === 0 && (
@@ -286,9 +285,6 @@ export function CardScreen() {
             {retriesSummary(retries)}
             <small class="chain">{retriesConsequence(retries)}</small>
           </Claim>
-          <p class="note">
-            署名用電子証明書の内容（氏名・住所・生年月日・性別）はパスワードを入力するまで読み出せません。
-          </p>
         </div>
       )}
 
@@ -669,7 +665,7 @@ export function SignScreen() {
         defaultPath: item.output,
       });
       if (typeof chosen !== "string") {
-        notify("info", "保存先の指定をやめました。署名はそのまま保持しています。");
+        notify("info", "保存先の指定をやめました。署名はそのまま残っています。");
         return;
       }
       outputs.push(chosen);
@@ -838,6 +834,7 @@ export function SignScreen() {
     results.length +
     blockedByTimestamp.length +
     blockedByWrite.length +
+    cancelled.length +
     unsignedCount +
     signDiscarded.value;
   // The heading has to add up, so the total is whichever is larger: a queue restored from an earlier
@@ -849,6 +846,7 @@ export function SignScreen() {
     resultParts.push(`${blockedByTimestamp.length} 件はタイムスタンプ待ち`);
   }
   if (blockedByWrite.length > 0) resultParts.push(`${blockedByWrite.length} 件は書き出し待ち`);
+  if (cancelled.length > 0) resultParts.push(`${cancelled.length} 件は取得を中止`);
   if (unsignedCount > 0) resultParts.push(`${unsignedCount} 件は未署名`);
   if (signDiscarded.value > 0) resultParts.push(`${signDiscarded.value} 件は破棄`);
   if (total > accounted) resultParts.push(`${total - accounted} 件は結果が分かりません`);
@@ -894,8 +892,8 @@ export function SignScreen() {
             <strong>
               このカードは、切断するか、リーダーから取り外すまで、署名鍵のロックが解除されたままです。
             </strong>
-            この間は、ほかのアプリからも同じカードで署名できます。席を離れるときは切断するか、
-            カードを抜いてください。もう一度署名するには「カード」画面で接続します。
+            この間は、ほかのアプリからも同じカードで署名できます。席を離れるときは、
+            下のボタンで切断してください。
           </p>
           <div class="row">
             <button class="ghost" onClick={disconnectCard} disabled={cardBusy.value || busy}>
@@ -927,8 +925,7 @@ export function SignScreen() {
         <div class="empty">
           <p>署名するファイルが選ばれていません。</p>
           <p class="note">
-            「ファイルを選ぶ」を押すか、この画面にファイルをドロップしてください。PDF を 1
-            つだけ選ぶと、PDF の中に署名を埋め込みます。
+            「ファイルを選ぶ」を押すか、この画面にファイルをドロップしてください。PDF を 1 つだけ選ぶと、その中に署名を埋め込みます。
           </p>
         </div>
       ) : (
@@ -975,9 +972,7 @@ export function SignScreen() {
           </div>
           {!isPdf && files.some((path) => path.toLowerCase().endsWith(".pdf")) && (
             <p class="note">
-              PDF が含まれていますが、複数のファイルを選んでいるため、
-              PDF も OpenPGP 署名（.asc）になります。
-              PDF の中に署名を埋め込むには、その PDF だけを選んでください。
+              複数のファイルを選んでいるため、PDF も OpenPGP 署名（.asc）になります。PDF の中に署名を埋め込むには、その 1 つだけを選んでください。
             </p>
           )}
         </div>
@@ -1013,8 +1008,8 @@ export function SignScreen() {
           <h2>OpenPGP 署名（.asc）</h2>
           <p class="note">
             {cleartext.value
-              ? "本文と署名を 1 つにまとめた〈元のファイル名〉.asc を作ります。元のファイルは 1 バイトも変更しません。相手には .asc だけを渡せば検証できます。同じ名前の .asc がある場合は上書きされます。"
-              : "元のファイルは 1 バイトも変更しません。同じ場所に〈元のファイル名〉.asc を作ります。相手には元のファイルと .asc の両方を渡してください。同じ名前の .asc がある場合は上書きされます。"}
+              ? "本文と署名を 1 つにまとめた〈元のファイル名〉.asc を作ります。元のファイルは 1 バイトも変更しません。相手には .asc だけを渡せば検証できます。"
+              : "元のファイルは 1 バイトも変更しません。同じ場所に〈元のファイル名〉.asc を作ります。相手には元のファイルと .asc の両方を渡してください。"}
           </p>
           <label class="check">
             <input
@@ -1044,9 +1039,9 @@ export function SignScreen() {
               OpenPGP 公開鍵も書き出す
               <small>
                 gpg で検証できるようになります。
-                {publicKeyName ?? "〈先頭ファイル名〉.pubkey.asc"}
+                {publicKeyName ?? "〈先頭ファイル名〉.pubkey.asc"}{" "}
                 を原本の隣に作ります。この鍵の User ID
-                には証明書の氏名が入るため、証明書を埋め込まない場合でも氏名は開示されます。
+                には証明書の氏名が入るため、証明書を埋め込まない場合でも開示されます。
               </small>
             </span>
           </label>
@@ -1059,8 +1054,7 @@ export function SignScreen() {
             <span>
               クリアテキスト署名にする
               <small>
-                本文と署名を 1 つの読めるファイルにまとめます。テキストファイルのみ。
-                各行の末尾の空白は署名できないため取り除かれます。
+                本文と署名を 1 つの読めるファイルにまとめます。テキストファイルにのみ使えます。各行の末尾の空白は署名できないため取り除かれます。
               </small>
             </span>
           </label>
@@ -1087,9 +1081,7 @@ export function SignScreen() {
         <div class="panel">
           <h2>PDF 署名</h2>
           <p class="warn-box">
-            この PDF には署名用電子証明書が必ず同梱されます。
-            受け取った人は氏名・住所・生年月日・性別を読み出せます。
-            PDF 署名では同梱を外す選択肢はありません（外すと誰も検証できなくなるためです）。
+            この PDF には署名用電子証明書が必ず同梱され、受け取った人は氏名・住所・生年月日・性別を読み出せます。外す選択肢はありません（外すと誰も検証できなくなるためです）。
           </p>
           <label class="field">
             <span>理由</span>
@@ -1116,10 +1108,7 @@ export function SignScreen() {
             <span>
               署名をページに表示しない
               <small>
-                既定では、署名者名・日時・証明書の指紋（および入力した理由・場所）を記した枠がページに描かれます。
-                これを外すと、ページ上には何も現れません。
-                ただし枠に出るのは氏名だけで、住所・生年月日・性別を含む証明書は、枠の有無にかかわらず文書の中に入ります。
-                見えないだけで、隠されているわけではありません。
+                既定では、署名者名・日時・証明書の指紋（および入力した理由・場所）を記した枠がページに描かれます。これを選ぶと、ページ上には何も現れません。ただし枠に出るのは氏名だけで、住所・生年月日・性別を含む証明書は、枠の有無にかかわらず文書に入ります。見えないだけで、隠されているわけではありません。
               </small>
             </span>
           </label>
@@ -1159,8 +1148,7 @@ export function SignScreen() {
             />
           )}
           <p class="note">
-            署名は追記（インクリメンタル更新）で行われます。元の PDF
-            のバイト列は変更されないため、既存の署名は壊れません。
+            署名は追記（インクリメンタル更新）で書き込みます。元の PDF のバイト列は変えないため、既存の署名は壊れません。
           </p>
         </div>
       )}
@@ -1181,8 +1169,7 @@ export function SignScreen() {
                 中止
               </button>
               <small class="chain">
-                1 件あたり最大 15 秒待ちます（応答が無い場合）。中止しても、取得中の 1
-                件は最後まで待ちます。
+                応答が無いときは 1 件あたり最大 15 秒かかります。中止しても、取得中の 1 件は最後まで待ちます。
               </small>
             </>
           )}
@@ -1193,8 +1180,7 @@ export function SignScreen() {
         <div class="panel">
           <h2>署名できなかったファイルがあります</h2>
           <p class="warn-box">
-            <strong>{failure.path} の署名に失敗し、そこでバッチを止めました。</strong>
-            以降のファイルはカードに送っていません。
+            <strong>{failure.path} の署名に失敗したため、そこで中断しました。</strong>
           </p>
           <p class="error">{failure.message}</p>
           {failure.skipped.length > 0 && (
@@ -1334,19 +1320,16 @@ function PendingPanel({
       {kind === "timestamp" ? (
         <p class="warn-box">
           <strong>署名そのものは作成済みです。</strong>
-          まだファイルに書き出していないだけなので、失われていません。
-          再試行してもカードの操作もパスワードの再入力も不要です。
+          まだファイルに書き出していないだけなので、失われていません。再試行しても、カードの操作やパスワードの再入力は必要ありません。
         </p>
       ) : kind === "write" ? (
         <p class="warn-box">
-          <strong>署名そのものは問題なく作成済みです。</strong>
-          書き出し先に問題があります: {reasons.join(" / ")}
+          <strong>署名そのものは作成済みです。</strong>{reasons.join(" / ")}
         </p>
       ) : (
         <p class="warn-box">
           <strong>署名そのものは作成済みです。</strong>
-          中止したのはタイムスタンプの取得だけで、署名は失われていません。
-          再試行してもカードの操作もパスワードの再入力も不要です。
+          中止したのはタイムスタンプの取得だけで、署名は失われていません。再試行しても、カードの操作やパスワードの再入力は必要ありません。
         </p>
       )}
       <ul class="planned">
@@ -1392,8 +1375,7 @@ function PendingPanel({
       </div>
       {kind === "timestamp" && (
         <p class="note">
-          タイムスタンプなしで保存した署名は、
-          証明書の有効期限が切れると署名時点で有効だったことを示せなくなります。
+          タイムスタンプなしで保存した署名は、証明書の有効期限が切れると署名時点で有効だったことを示せなくなります。
         </p>
       )}
       {/* Set apart from the row above: this is the one button here that cannot be undone, and eight
@@ -1756,7 +1738,7 @@ export function VerifyScreen() {
               <strong>原本</strong>
               <small class="chain">
                 {slotIsPdf
-                  ? "署名済み PDF は原本を必要としません（PDF 自身が原本です）。"
+                  ? "署名済み PDF は原本を必要としません（PDF そのものが原本です）。"
                   : "分離署名（.asc / .sig）が署名したファイルそのもの"}
               </small>
               {!slotIsPdf &&
@@ -1938,8 +1920,7 @@ export function VerifyScreen() {
             })}
           </ul>
           <p class="note">
-            一覧に出るのは、検証できなかったものの理由だけです。うまくいった検証の要約は出しません
-            — 一行にまとめられる「有効」を本アプリは出せないためです。中身は「表示」で確認してください。
+            一覧に出るのは、検証できなかったものの理由だけです。うまくいった検証の要約は出しません。一行にまとめられる「有効」を、本アプリは出せないからです。中身は「表示」で確認してください。
           </p>
         </div>
       )}
@@ -1967,8 +1948,7 @@ export function SettingsScreen() {
           <span>
             JPKI テスト階層を受け入れる
             <small>
-              テストカードの検証にのみ使います。テストカードは実在の本人のマイナンバーカードではありません。
-              切り替えると、検証画面に表示中の結果は破棄されます（別の方針で計算した結果を残さないためです）。
+              テストカードの検証にのみ使います。テストカードは実在の本人のマイナンバーカードではありません。切り替えると、検証画面に表示中の結果は破棄されます（別の方針で計算した結果を残さないためです）。
             </small>
           </span>
         </label>
@@ -2087,8 +2067,7 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
         </p>
       ) : (
         <p class="note">
-          <strong>送信先: {destination}</strong> — 送るのは署名のハッシュ 32
-          バイトのみ。文書は送りません。
+          <strong>送信先: {destination}</strong>。送るのは署名のハッシュ 32 バイトだけで、文書は送りません。
         </p>
       )}
       {withTest && (

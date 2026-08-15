@@ -91,7 +91,7 @@ function disclosureLines(
     }
   } else {
     lines.push({
-      term: "署名ファイル (.asc)",
+      term: "署名ファイル（.asc）",
       body: disclosure.embed ? (
         <>.asc に署名用電子証明書を埋め込みます — {basics}が相手に開示されます。</>
       ) : (
@@ -125,8 +125,8 @@ function disclosureLines(
         "外部へは何も送信しません。"
       ) : (
         <>
-          送信先: <code>{tsaDestination}</code> — 送るのは署名のハッシュ 32
-          バイトのみ。文書は送りません。
+          送信先: <code>{tsaDestination}</code>。送るのは署名のハッシュ 32
+          バイトだけで、文書は送りません。
         </>
       ),
   });
@@ -145,7 +145,7 @@ function disclosureLines(
  */
 function unusable(password: string): string | null {
   if (/[a-z]/.test(password)) {
-    return "英字は大文字だけです。署名用パスワードは大文字で登録されています。";
+    return "英字は大文字で入力してください。署名用パスワードは大文字で登録されています。";
   }
   if (!/^[A-Z0-9]*$/.test(password)) {
     return "使えるのは英数字（A〜Z と 0〜9）だけです。";
@@ -179,10 +179,10 @@ export function PasswordDialog({
   /**
    * Put the caret in the field, and the field somewhere it can be seen.
    *
-   * The scroll an engine does for a focused element brings it just inside the edge, which with the
-   * pinned row below is underneath it. The field carries a bottom scroll margin the height of that
-   * row instead, so the smallest scroll that satisfies it also clears the row — and when the
-   * dialog already fits, that scroll is none, and the heading stays where the reader left it.
+   * The field sits outside the scrolling part of the dialog, so it is always in view and the
+   * scroll here is normally none. `preventScroll` is still what makes that true: focusing without
+   * it lets the engine scroll an ancestor to satisfy itself, and the one time that had somewhere
+   * to go it took the title and "以下に電子署名します。" off the top of the box.
    */
   function focusPassword() {
     const node = input.current;

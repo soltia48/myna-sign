@@ -1168,7 +1168,7 @@ async fn resolve_pending(
         && outputs.len() != ids.len()
     {
         return Err(AppError::Failed {
-            message: "書き出し先の数が、選ばれた署名の数と合いません。".into(),
+            message: "書き出し先の数が、選んだ署名の件数と合いません。".into(),
         });
     }
 
@@ -1323,8 +1323,9 @@ async fn export_verification(path: String, lines: Vec<String>) -> Result<()> {
 
 /// The largest file the placement view will load into the window.
 ///
-/// A signature can be put on a PDF of any size; only the *preview* is capped, and a document past
-/// this is signed with coordinates typed in instead of drawn.
+/// A signature can be put on a PDF of any size; only the *preview* is capped. A document past this
+/// is signed where `default_signature_placement` puts it, which reads the file in Rust and is not
+/// capped — so the signature still lands, it just cannot be moved by hand.
 const PREVIEW_LIMIT: u64 = 64 * 1024 * 1024;
 
 /// Read a file for the window to display.
@@ -1346,7 +1347,8 @@ async fn read_file(path: String) -> Result<tauri::ipc::Response> {
     if length > PREVIEW_LIMIT {
         return Err(AppError::Failed {
             message: format!(
-                "{path} は {} MB あり、プレビューの上限 {} MB を超えています。座標を入力して配置してください。",
+                "{} は {} MB あり、表示できる上限の {} MB を超えています。このまま署名すると、既定の位置に署名されます。",
+                file_label(&path),
                 length / 1024 / 1024,
                 PREVIEW_LIMIT / 1024 / 1024
             ),

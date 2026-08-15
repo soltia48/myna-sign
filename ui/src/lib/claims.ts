@@ -188,7 +188,7 @@ function pgpSignatureClaim(v: PgpVerification): ClaimLine {
       label: "署名の検証",
       value: "この文書と署名は一致しません",
       detail:
-        "原本が署名の後で変わったか、この証明書の鍵で作られた署名ではありません。",
+        "原本が署名の後で変わったか、この証明書の鍵で作られた署名ではないかのどちらかです。",
     };
   }
   if (!v.certificate) {
@@ -282,7 +282,7 @@ export function pdfClaims(v: PdfSignatureVerification): ClaimLine[] {
         : "署名対象と一致しません",
       detail: v.documentDigestMatches
         ? undefined
-        : "この署名が対象とした内容と、いま開いているファイルの内容が違います。",
+        : "この署名が対象とした内容と、いま開いているファイルが違います。",
     },
     {
       tone: v.byteRangeSound ? "ok" : "bad",

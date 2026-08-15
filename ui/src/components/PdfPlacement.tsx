@@ -664,7 +664,7 @@ export function PdfPlacement({
         </button>
       </div>
 
-      {error && <p class="error">プレビューを表示できません: {error}</p>}
+      {error && <p class="error">プレビューを表示できません。{error}</p>}
 
       <div class="page-viewport" ref={scroller} style={{ maxHeight: VIEWPORT_HEIGHT }}>
         {loading && <p class="page-loading-inline">読み込み中…</p>}
@@ -750,7 +750,6 @@ export function PdfPlacement({
           : "どのページでもドラッグすると、そのページに署名が置かれます。"}
         {rect && (
           <>
-            {" "}
             現在は {page} ページ目の PDF 座標 [{rect.map((n) => Math.round(n)).join(" ")}]
             （原点は左下）。
           </>
@@ -759,8 +758,8 @@ export function PdfPlacement({
 
       <small class="note" id={helpId}>
         キーボードでも指定できます。Tab でページに入り、PageUp / PageDown で前後のページへ、
-        Enter でそのページに署名を置きます。矢印キーで 4pt、Shift を押しながらで 20pt 動かし、
-        Alt を押しながらの矢印キーで大きさを変えます（→ ↓ で大きく、← ↑ で小さく）。
+        Enter でそのページに署名を置きます。矢印キーで 4pt、Shift と一緒に押すと 20pt 動きます。
+        Alt と矢印キーで大きさを変えます（→ ↓ で大きく、← ↑ で小さく）。
       </small>
     </div>
   );

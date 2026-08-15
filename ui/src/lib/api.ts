@@ -436,14 +436,14 @@ export function describe(error: AppError): string {
       return PIN_BLOCKED.sentence;
     case "pinIncorrect":
       return error.retries === null
-        ? "署名用パスワードが違います。カードは残り回数を報告しませんでした。"
+        ? "署名用パスワードが違います。カードは残り回数を報告していません。"
         : `署名用パスワードが違います。残り ${error.retries} 回でロックされます。`;
     case "notConnected":
       return "カードが接続されていません。「カード」画面で接続してください。";
     case "cardRemoved":
       return "カードが応答しなくなりました。リーダーに正しく載っているか確認して、もう一度接続してください。";
     case "card":
-      return `カードとのやり取りに失敗しました。（${error.message}）カードがリーダーに正しく載っているか確認して、もう一度試してください。`;
+      return `カードとのやり取りに失敗しました。（${error.message}）リーダーに正しく載っているか確認して、もう一度試してください。`;
     case "io":
       return `${error.operation}に失敗しました。（${error.detail}）`;
     case "notText":
