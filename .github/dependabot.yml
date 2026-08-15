@@ -1,0 +1,47 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
+
+  # The library and the CLI. This is where the X.509 parsing, the CMS and PDF assembly and the
+  # RFC 3161 client live, so an update here can change what a signature looks like — grouped
+  # minor and patch updates keep the noise down without hiding a major bump.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+    groups:
+      patch-and-minor:
+        update-types: [minor, patch]
+
+  # The application is a separate workspace with its own lockfile, so it needs its own entry:
+  # an update to the root does not reach it, and a Tauri release that only landed in one of the
+  # two is how the two copies of `myna-card` drift apart.
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+    groups:
+      patch-and-minor:
+        update-types: [minor, patch]
+
+  # The front end. `pdfjs-dist` renders the page a signature is placed on, and a placement drawn
+  # against a viewport that changed is a signature somewhere other than where it was drawn — so
+  # this one is worth reading rather than merging on sight.
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+    groups:
+      patch-and-minor:
+        update-types: [minor, patch]

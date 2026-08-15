@@ -11,7 +11,7 @@
 //! tag `0x31` rather than the `[0] IMPLICIT` tag they carry inside the `SignerInfo`. Signing the
 //! bytes as they appear in the structure is a classic mistake; it produces a signature that no
 //! other implementation accepts. [`signed_attrs_der`] is the single place that re-tagging happens,
-//! and [`tests::the_signed_attributes_are_hashed_with_the_set_of_tag`] pins it.
+//! and `tests::the_signed_attributes_are_hashed_with_the_set_of_tag` pins it.
 //!
 //! The document reaches the signature through the `messageDigest` attribute, which holds its
 //! SHA-256. So verifying takes both steps: check the signature over the attributes, *and* check

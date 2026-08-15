@@ -9,7 +9,7 @@
 //! Nothing here is checked by anything. The name in the panel is drawn from the certificate, and
 //! the certificate is what a verifier actually reads; the panel is for the person looking at the
 //! page. A document whose panel says one thing and whose signature says another is caught by
-//! [`crate::pdf::verify`], which does not look at the panel at all. That is worth stating because
+//! [`crate::pdf::verify()`], which does not look at the panel at all. That is worth stating because
 //! a drawn "電子署名" is exactly the kind of thing that gets mistaken for a verdict.
 //!
 //! # The font is carried, not borrowed

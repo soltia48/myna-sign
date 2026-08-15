@@ -12,6 +12,12 @@
 //! so [`disconnect`] and the exit handler both power-cycle the card. Closing the window without
 //! that would leave the signature key unlocked for whatever talks to the card next.
 
+// This crate is never published, and the people its documentation is for are the people who
+// maintain it. A doc link to a private command or to `AppState::with_session` points exactly
+// where such a reader wants to go; the lint exists to stop a *library* linking somewhere its
+// readers cannot follow, which is not the situation here.
+#![allow(rustdoc::private_intra_doc_links)]
+
 use std::sync::{Arc, Mutex};
 
 use myna_sign_card::{CardSession, CardStatus, Sharing};
