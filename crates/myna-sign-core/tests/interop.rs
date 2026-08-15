@@ -47,12 +47,31 @@ fn gpg_in(dir: &TempDir, args: &[&str]) -> std::process::Output {
         .expect("gpg failed to start")
 }
 
+/// Where a throwaway directory goes.
+///
+/// Not `std::env::temp_dir()` on Unix. On macOS that is `$TMPDIR`, a per-user directory under
+/// `/var/folders` that canonicalises to about ninety characters — and `gpg` puts the agent's Unix
+/// socket inside whatever home directory it is given. `sun_path` holds 104 bytes there, so
+/// `<homedir>/S.gpg-agent` does not fit, and every invocation ends with "can't connect to the
+/// gpg-agent: File name too long" *after* doing its work correctly. A short base keeps the socket
+/// nameable. Windows has no such limit and no such socket.
+fn temp_base() -> PathBuf {
+    #[cfg(unix)]
+    {
+        PathBuf::from("/tmp")
+    }
+    #[cfg(not(unix))]
+    {
+        std::env::temp_dir()
+    }
+}
+
 /// A directory that goes away when the test does.
 struct TempDir(PathBuf);
 
 impl TempDir {
     fn new(name: &str) -> Self {
-        let mut path = std::env::temp_dir();
+        let mut path = temp_base();
         path.push(format!(
             "myna-sign-{name}-{}-{}",
             std::process::id(),
@@ -61,6 +80,13 @@ impl TempDir {
             &format!("{:p}", &name)[2..]
         ));
         std::fs::create_dir_all(&path).unwrap();
+        // `gpg` warns about a home directory other people can read, which is fair of it. The
+        // warning is noise in a log somebody only opens when something else has gone wrong.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
         TempDir(path)
     }
 
@@ -113,21 +139,24 @@ fn gpg_verifies_a_detached_signature_we_made() {
     std::fs::write(dir.join("document.txt.asc"), &signature.armored).unwrap();
 
     let imported = gpg_in(&dir, &["--import", "public.asc"]);
+    // What gpg says it did, not what it exits with. Its exit status also carries things that have
+    // nothing to do with the key — an unreachable gpg-agent is the one that bites here, and it
+    // reports the import as done and then exits non-zero anyway.
+    let stderr = String::from_utf8_lossy(&imported.stderr);
     assert!(
-        imported.status.success(),
-        "gpg would not import the key we exported:\n{}",
-        String::from_utf8_lossy(&imported.stderr)
+        stderr.contains("imported: 1"),
+        "gpg would not import the key we exported:\n{stderr}"
     );
 
     let verified = gpg_in(&dir, &["--verify", "document.txt.asc", "document.txt"]);
     let stderr = String::from_utf8_lossy(&verified.stderr);
-    assert!(
-        verified.status.success(),
-        "gpg rejected our signature:\n{stderr}"
-    );
+    // The verdict is the sentence, not the exit status: gpg exits non-zero for an unreachable
+    // agent as readily as for a signature that does not check out, and only one of those is what
+    // this test is asking about. The status goes in the message so a failure is still diagnosable.
     assert!(
         stderr.contains("Good signature"),
-        "gpg did not call it a good signature:\n{stderr}"
+        "gpg did not call it a good signature (exit {}):\n{stderr}",
+        verified.status
     );
 }
 
@@ -162,10 +191,13 @@ fn gpg_rejects_a_signature_over_a_document_that_changed() {
     // Checked rather than discarded: an import that failed leaves gpg with no key, and then the
     // verification below fails for that reason instead of the one under test.
     let imported = gpg_in(&dir, &["--import", "public.asc"]);
+    // What gpg says it did, not what it exits with. Its exit status also carries things that have
+    // nothing to do with the key — an unreachable gpg-agent is the one that bites here, and it
+    // reports the import as done and then exits non-zero anyway.
+    let stderr = String::from_utf8_lossy(&imported.stderr);
     assert!(
-        imported.status.success(),
-        "gpg would not import the key we exported:\n{}",
-        String::from_utf8_lossy(&imported.stderr)
+        stderr.contains("imported: 1"),
+        "gpg would not import the key we exported:\n{stderr}"
     );
 
     let verified = gpg_in(&dir, &["--verify", "document.txt.asc", "document.txt"]);
@@ -552,17 +584,21 @@ fn gpg_verifies_a_cleartext_signature() {
     // Checked rather than discarded: an import that failed leaves gpg with no key, and then the
     // verification below fails for that reason instead of the one under test.
     let imported = gpg_in(&dir, &["--import", "public.asc"]);
+    // What gpg says it did, not what it exits with. Its exit status also carries things that have
+    // nothing to do with the key — an unreachable gpg-agent is the one that bites here, and it
+    // reports the import as done and then exits non-zero anyway.
+    let stderr = String::from_utf8_lossy(&imported.stderr);
     assert!(
-        imported.status.success(),
-        "gpg would not import the key we exported:\n{}",
-        String::from_utf8_lossy(&imported.stderr)
+        stderr.contains("imported: 1"),
+        "gpg would not import the key we exported:\n{stderr}"
     );
 
     let verified = gpg_in(&dir, &["--verify", "message.asc"]);
     let stderr = String::from_utf8_lossy(&verified.stderr);
     assert!(
-        verified.status.success() && stderr.contains("Good signature"),
-        "gpg rejected our cleartext signature:\n{stderr}"
+        stderr.contains("Good signature"),
+        "gpg rejected our cleartext signature (exit {}):\n{stderr}",
+        verified.status
     );
 
     // And our own verifier agrees.
