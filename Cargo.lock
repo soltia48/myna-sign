@@ -511,7 +511,7 @@ dependencies = [
  "const-oid 0.9.6",
  "der 0.7.10",
  "rsa",
- "sha1",
+ "sha1 0.10.7",
  "sha2 0.10.9",
  "sha3 0.10.9",
  "signature 2.2.0",
@@ -1669,7 +1669,7 @@ dependencies = [
  "thiserror",
  "ureq",
  "webpki-roots",
- "x509-cert 0.2.5",
+ "x509-cert 0.3.0",
  "x509-tsp",
 ]
 
@@ -2439,6 +2439,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "sha1collisiondetection"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2525,6 +2536,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5"
 dependencies = [
  "digest 0.11.3",
+ "rand_core 0.10.1",
 ]
 
 [[package]]
@@ -3163,7 +3175,7 @@ checksum = "1301e935010a701ae5f8655edc0ad17c44bad3ac5ce8c39185f75453b720ae94"
 dependencies = [
  "const-oid 0.9.6",
  "der 0.7.10",
- "sha1",
+ "sha1 0.10.7",
  "signature 2.2.0",
  "spki 0.7.3",
  "tls_codec",
@@ -3177,6 +3189,8 @@ checksum = "105ef4642d9cb137ef83d623d0e4bf08b8adf69e9918ca904a174adb6d3d038b"
 dependencies = [
  "const-oid 0.10.2",
  "der 0.8.1",
+ "sha1 0.11.0",
+ "signature 3.0.0",
  "spki 0.8.0",
  "tls_codec",
 ]
