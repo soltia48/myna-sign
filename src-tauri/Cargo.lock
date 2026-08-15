@@ -2900,7 +2900,7 @@ dependencies = [
  "serde",
  "sha2 0.10.9",
  "signature 2.2.0",
- "spki 0.7.3",
+ "spki 0.8.0",
  "thiserror 2.0.20",
  "ureq",
  "webpki-roots",

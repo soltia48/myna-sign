@@ -51,7 +51,7 @@ serde_json = "1"
 # that myna-card's x509-cert 0.3 brings; see docs/DESIGN.md §3.1. Only DER bytes cross between.
 der = { version = "0.7", features = ["derive", "oid"] }
 const-oid = { version = "0.9", features = ["db"] }
-spki = "0.7"
+spki = "0.8"
 x509-cert = "0.2"
 cms = { version = "0.2", features = ["builder"] }
 x509-tsp = "0.1"
