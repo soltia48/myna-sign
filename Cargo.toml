@@ -34,7 +34,7 @@ signature = "2"
 zeroize = { version = "1.9", features = ["zeroize_derive"] }
 serde = { version = "1", features = ["derive"] }
 hex = "0.4"
-rand = "0.8"
+rand = "0.10"
 webpki-roots = "1.0"
 cmpv2 = "0.2"
 # sequoia hands back `anyhow::Error`; naming it is better than stringifying at every call site.
