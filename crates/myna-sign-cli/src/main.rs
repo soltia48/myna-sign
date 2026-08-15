@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use myna_sign_card::Sharing;
 use myna_sign_core::error::{Error, Result};
 use myna_sign_core::openpgp::{self, SignOptions};
 use myna_sign_core::pdf;
@@ -180,7 +181,10 @@ fn run(cli: &Cli) -> Result<()> {
             Ok(())
         }
         Command::Card => {
-            let mut session = myna_sign_card::CardSession::connect(cli.reader.as_deref())?;
+            // Reads only, so it shares: a command for looking at the card should not be able to
+            // evict whatever else is using it.
+            let mut session =
+                myna_sign_card::CardSession::connect(cli.reader.as_deref(), Sharing::Shared)?;
             let status = session.status()?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             if status.has_auth_certificate {
@@ -457,7 +461,10 @@ where
         return body(&mut signer, None);
     }
 
-    let mut session = myna_sign_card::CardSession::connect(cli.reader.as_deref())?;
+    // Exclusive: this session presents the signature password, and the security status that
+    // creates is reachable by anything else holding the card until it is powered down.
+    let mut session =
+        myna_sign_card::CardSession::connect(cli.reader.as_deref(), Sharing::Exclusive)?;
     let status = session.status()?;
     if !status.has_sign_certificate {
         return Err(Error::NotChecked(

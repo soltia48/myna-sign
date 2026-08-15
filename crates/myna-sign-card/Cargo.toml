@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 myna-sign-core = { path = "../myna-sign-core" }
 myna-card = { workspace = true, features = ["pcsc", "verify"] }
+pcsc.workspace = true
 thiserror.workspace = true
 zeroize.workspace = true
 serde.workspace = true

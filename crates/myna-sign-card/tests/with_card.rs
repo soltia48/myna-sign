@@ -13,7 +13,9 @@
 
 use myna_card::ap::jpki::JpkiAp;
 use myna_card::{Card, transport::pcsc};
-use myna_sign_card::CardSession;
+// `pcsc` above is myna-card's module; the leading `::` is what reaches the crate of that name.
+use ::pcsc as pcsc_crate;
+use myna_sign_card::{CardSession, Sharing};
 
 /// The password, or `None` to skip.
 fn password() -> Option<String> {
@@ -25,7 +27,7 @@ fn password() -> Option<String> {
 #[test]
 #[ignore = "needs a card in a reader"]
 fn reads_what_the_card_says_without_a_password() {
-    let mut session = CardSession::connect(None).expect("no card");
+    let mut session = CardSession::connect(None, Sharing::Shared).expect("no card");
     let status = session.status().expect("cannot read the card");
 
     println!("{status:#?}");
@@ -73,7 +75,7 @@ fn powering_the_card_down_clears_the_security_status() {
             .is_ok()
     }
 
-    let mut card = pcsc::connect_any().expect("no card");
+    let mut card = pcsc::connect_any(Sharing::Shared).expect("no card");
     assert!(
         !sign_certificate_readable(&mut card),
         "the 署名用証明書 read before any password was presented — the card was already unlocked, \
@@ -83,7 +85,7 @@ fn powering_the_card_down_clears_the_security_status() {
     drop(card);
 
     {
-        let mut session = CardSession::connect(None).expect("no card");
+        let mut session = CardSession::connect(None, Sharing::Exclusive).expect("no card");
         session
             .unlock(&mut password)
             .expect("the password was refused");
@@ -93,7 +95,7 @@ fn powering_the_card_down_clears_the_security_status() {
         session.close().expect("the card did not power down");
     }
 
-    let mut card = pcsc::connect_any().expect("the card went away");
+    let mut card = pcsc::connect_any(Sharing::Shared).expect("the card went away");
     assert!(
         !sign_certificate_readable(&mut card),
         "the 署名用証明書 still reads after power_cycle: the security status survived, and closing \
@@ -114,7 +116,7 @@ fn one_unlock_signs_more_than_once() {
         return;
     };
 
-    let mut session = CardSession::connect(None).expect("no card");
+    let mut session = CardSession::connect(None, Sharing::Exclusive).expect("no card");
     session
         .unlock(&mut password)
         .expect("the password was refused");
@@ -130,4 +132,31 @@ fn one_unlock_signs_more_than_once() {
     }
 
     session.close().expect("the card did not power down");
+}
+
+/// An exclusive session actually keeps other connections out.
+///
+/// The one thing about `Sharing::Exclusive` that cannot be established without hardware. Everything
+/// below the API is the PC/SC service's behaviour, and a mode that silently did nothing would look
+/// exactly like a mode that worked — right up until another program signed with a key this
+/// application had unlocked.
+///
+/// No password, so this one costs nothing to run.
+#[test]
+#[ignore = "needs a card in a reader"]
+fn an_exclusive_session_locks_other_connections_out() {
+    let session = CardSession::connect(None, Sharing::Exclusive).expect("no card");
+
+    let refused = pcsc::connect_any(Sharing::Shared);
+    assert!(
+        matches!(
+            refused,
+            Err(myna_card::Error::Pcsc(pcsc_crate::Error::SharingViolation))
+        ),
+        "a second connection was allowed while an exclusive session was open: {refused:?}"
+    );
+
+    // And the card is usable again once the reservation is given up.
+    session.close().expect("the card did not power down");
+    pcsc::connect_any(Sharing::Shared).expect("the card stayed locked after close");
 }

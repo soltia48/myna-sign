@@ -387,6 +387,7 @@ export type AppError =
   | { kind: "pinBlocked" }
   | { kind: "notConnected" }
   | { kind: "cardRemoved" }
+  | { kind: "cardBusy" }
   | { kind: "io"; operation: string; detail: string }
   | { kind: "notText"; path: string }
   | { kind: "failed"; message: string };
@@ -398,6 +399,7 @@ const KINDS = new Set<AppError["kind"]>([
   "pinBlocked",
   "notConnected",
   "cardRemoved",
+  "cardBusy",
   "io",
   "notText",
   "failed",
@@ -441,9 +443,11 @@ export function describe(error: AppError): string {
     case "notConnected":
       return "カードが接続されていません。「カード」画面で接続してください。";
     case "cardRemoved":
-      return "カードが応答しなくなりました。リーダーに正しく載っているか確認して、もう一度接続してください。";
+      return "カードが応答しなくなりました。リーダーに正しくセットされているか確認して、もう一度接続してください。";
+    case "cardBusy":
+      return "ほかのアプリがカードを使用中です。本アプリは署名中のカードを占有します。e-Tax や JPKI 利用者ソフトなど、カードを使っているアプリを終了してから、もう一度接続してください。";
     case "card":
-      return `カードとのやり取りに失敗しました。（${error.message}）リーダーに正しく載っているか確認して、もう一度試してください。`;
+      return `カードとのやり取りに失敗しました。（${error.message}）リーダーに正しくセットされているか確認して、もう一度試してください。`;
     case "io":
       return `${error.operation}に失敗しました。（${error.detail}）`;
     case "notText":

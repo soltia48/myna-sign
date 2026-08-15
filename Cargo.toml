@@ -17,7 +17,10 @@ repository = "https://github.com/soltia48/myna-sign"
 # The card. `myna-sign-core` takes it without the PC/SC backend: it needs the JPKI X.509
 # certificate type and the J-LIS roots, both of which live behind `verify` and neither of which
 # talks to a reader. Only `myna-sign-card` turns `pcsc` on.
-myna-card = { version = "1.0", default-features = false }
+myna-card = { version = "2.0", default-features = false }
+# Named directly only to tell "another program is holding the card" apart from every other PC/SC
+# failure; that is the one the user can do something about. The version follows myna-card's.
+pcsc = "2.9"
 
 thiserror = "2"
 sha2 = "0.10"

@@ -14,7 +14,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use myna_sign_card::{CardSession, CardStatus};
+use myna_sign_card::{CardSession, CardStatus, Sharing};
 use myna_sign_core::error::Error;
 use myna_sign_core::openpgp::{self, SignOptions};
 use myna_sign_core::pdf;
@@ -62,6 +62,11 @@ pub enum AppError {
     /// Only ever produced after something else has already failed — see [`AppState::with_session`].
     /// Nothing asks the card whether it is there on a timer.
     CardRemoved,
+    /// Another program is holding the card, so it could not be taken exclusively.
+    ///
+    /// Not a fault: this application asks for the card to itself, and that is a request other
+    /// software is entitled to have got in first with. The interface says who to close.
+    CardBusy,
     /// A file could not be read or written.
     ///
     /// `operation` is already Japanese and user-facing; `detail` is the operating system's message,
@@ -91,6 +96,11 @@ impl From<Error> for AppError {
     /// Matching on prose would make the wording load-bearing, and it is not: every one of these
     /// strings exists to be read by a person and reworded when it reads badly.
     fn from(error: Error) -> Self {
+        // The guard asks `myna-sign-card`, which owns the PC/SC crate, rather than reading the
+        // message: the kind still comes from a variant, just one this crate cannot name.
+        if myna_sign_card::is_card_busy(&error) {
+            return AppError::CardBusy;
+        }
         match &error {
             Error::Card(myna_card::Error::PinIncorrect { retries }) => {
                 AppError::PinIncorrect { retries: *retries }
@@ -243,9 +253,13 @@ async fn list_readers() -> Result<Vec<String>> {
 }
 
 /// Connect to a card and read what it says without a password.
+///
+/// Exclusive, although nothing is unlocked yet: this session is the one the signature password will
+/// be presented to, and it lasts from here until the user disconnects. Asking for the card again at
+/// signing time would mean asking at the one moment a refusal costs the most.
 #[tauri::command]
 async fn connect(state: tauri::State<'_, AppState>, reader: Option<String>) -> Result<CardStatus> {
-    let mut session = CardSession::connect(reader.as_deref())?;
+    let mut session = CardSession::connect(reader.as_deref(), Sharing::Exclusive)?;
     let status = session.status()?;
     *state.session.lock().expect("poisoned") = Some(session);
     Ok(status)
@@ -567,6 +581,7 @@ pub enum PendingAction {
 fn signing_message(error: &AppError) -> String {
     match error {
         AppError::CardRemoved => "カードが応答しなくなりました。".into(),
+        AppError::CardBusy => "ほかのアプリがカードを使用中です。".into(),
         AppError::PinBlocked => "署名用パスワードがロックされました。".into(),
         AppError::PinIncorrect { .. } => "署名用パスワードが違います。".into(),
         AppError::NotConnected => "カードが接続されていません。".into(),

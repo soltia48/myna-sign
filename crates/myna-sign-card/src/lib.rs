@@ -15,6 +15,12 @@
 //! again in `Drop` for the paths that do not get there. Without that, closing the application
 //! leaves the signature key unlocked for whatever talks to the card next.
 //!
+//! Powering down closes the window at the end. [`Sharing::Exclusive`] closes it in the middle: a
+//! shared connection leaves the unlocked key reachable by anything else on the machine for as long
+//! as the session lasts, and that is the whole time between the password and the signature. A
+//! session that will present a password takes the card to itself; one that only reads does not,
+//! because reserving a card nobody is signing with locks out software somebody may be relying on.
+//!
 //! # Retry counters
 //!
 //! The signature password allows five attempts, and a blocked key can only be unblocked at a
@@ -27,6 +33,8 @@
 
 use myna_card::ap::jpki::{JpkiAp, SignatureScheme, TokenType};
 use myna_card::transport::pcsc::{self, PcscTransport};
+// The PC/SC crate itself, aliased so `pcsc` keeps meaning myna-card's module everywhere below.
+use ::pcsc as pcsc_crate;
 use myna_card::{Card, Certificate, Pin, Retries};
 use myna_sign_core::error::{Error, Result};
 use myna_sign_core::signer::DigestSigner;
@@ -34,9 +42,27 @@ use myna_sign_core::x509::CertificateInfo;
 use serde::Serialize;
 use zeroize::Zeroize;
 
+pub use myna_card::transport::pcsc::Sharing;
+
 /// The readers the PC/SC service knows about.
 pub fn list_readers() -> Result<Vec<String>> {
     Ok(pcsc::list_readers()?)
+}
+
+/// Whether this error is another program holding the card.
+///
+/// Worth telling apart from every other PC/SC failure because it is the one the person at the
+/// keyboard can act on — close the other software, try again — and because it is the expected
+/// answer rather than a fault: asking for the card to yourself is asking something that can
+/// reasonably be refused.
+///
+/// A predicate rather than an error variant of its own so that the `pcsc` crate stays inside this
+/// module. Callers match on the answer, not on a message.
+pub fn is_card_busy(error: &Error) -> bool {
+    matches!(
+        error,
+        Error::Card(myna_card::Error::Pcsc(pcsc_crate::Error::SharingViolation))
+    )
 }
 
 /// What the card says about itself before anything is presented to it.
@@ -76,16 +102,23 @@ pub struct CardSession {
 impl CardSession {
     /// Connect to a card.
     ///
-    /// `reader` names one, or the first available is used.
-    pub fn connect(reader: Option<&str>) -> Result<Self> {
+    /// `reader` names one, or the first available is used. `sharing` says whether anything else may
+    /// hold the card meanwhile: [`Sharing::Exclusive`] for a session that will present the
+    /// signature password, [`Sharing::Shared`] for one that only reads.
+    ///
+    /// # Errors
+    ///
+    /// [`is_card_busy`] is true of the error when `sharing` is [`Sharing::Exclusive`] and something
+    /// else already has the card.
+    pub fn connect(reader: Option<&str>, sharing: Sharing) -> Result<Self> {
         let (card, reader) = match reader {
-            Some(name) => (pcsc::connect(name)?, name.to_owned()),
+            Some(name) => (pcsc::connect(name, sharing)?, name.to_owned()),
             None => {
                 let name = pcsc::list_readers()?
                     .into_iter()
                     .next()
                     .ok_or(myna_card::Error::NoReader)?;
-                (pcsc::connect(&name)?, name)
+                (pcsc::connect(&name, sharing)?, name)
             }
         };
         Ok(CardSession {
