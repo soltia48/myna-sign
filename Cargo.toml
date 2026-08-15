@@ -52,7 +52,7 @@ serde_json = "1"
 der = { version = "0.7", features = ["derive", "oid"] }
 const-oid = { version = "0.9", features = ["db"] }
 spki = "0.7"
-x509-cert = "0.2"
+x509-cert = "0.3"
 cms = { version = "0.2", features = ["builder"] }
 x509-tsp = "0.1"
 lopdf = { version = "0.44", default-features = false }
