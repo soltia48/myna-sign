@@ -1,4 +1,33 @@
 version: 2
+
+# The RustCrypto generation this project is pinned to, and why it cannot move a crate at a time.
+#
+# `cms` 0.2 and `x509-tsp` 0.1 are the newest releases of either, and both are built on `der` 0.7
+# and `x509-cert` 0.2. Everything below is in that same world by necessity — see the comment above
+# `[workspace.dependencies]` in Cargo.toml and DESIGN.md §3.1. Taking any one of them to the new
+# generation on its own does not produce a version conflict, it produces a type error: 107 of them
+# for `x509-cert` alone, 174 for `der`.
+#
+# Note the update types. These are 0.x crates, so `0.7 -> 0.8` leaves the major at zero and
+# Dependabot calls it a *minor* update; blocking only `semver-major` would let every one of them
+# through. `signature` is past 1.0 and is the one that means what it says.
+#
+# Remove this block when `cms` and `x509-tsp` publish against `der` 0.8, and take the whole set in
+# one change. Until then a proposal here is a red build, monthly.
+x-rustcrypto-generation: &rustcrypto-generation
+  - dependency-name: der
+    update-types: [version-update:semver-minor, version-update:semver-major]
+  - dependency-name: spki
+    update-types: [version-update:semver-minor, version-update:semver-major]
+  - dependency-name: x509-cert
+    update-types: [version-update:semver-minor, version-update:semver-major]
+  - dependency-name: sha2
+    update-types: [version-update:semver-minor, version-update:semver-major]
+  - dependency-name: p521
+    update-types: [version-update:semver-minor, version-update:semver-major]
+  - dependency-name: signature
+    update-types: [version-update:semver-major]
+
 updates:
   - package-ecosystem: github-actions
     directory: /
@@ -19,10 +48,18 @@ updates:
     groups:
       patch-and-minor:
         update-types: [minor, patch]
+    ignore: *rustcrypto-generation
 
-  # The application is a separate workspace with its own lockfile, so it needs its own entry:
-  # an update to the root does not reach it, and a Tauri release that only landed in one of the
-  # two is how the two copies of `myna-card` drift apart.
+  # The application is a separate workspace with its own lockfile, so it needs its own entry: an
+  # update to the root does not reach it, and `tauri`, `tauri-build` and `tauri-plugin-dialog` are
+  # declared nowhere else.
+  #
+  # It carries the same ignore list, and not by accident. This workspace reaches `crates/` by path,
+  # and those crates take their versions from the root `[workspace.dependencies]` — so a bump that
+  # would only touch `src-tauri/Cargo.lock` is still proposed as an edit to the root Cargo.toml,
+  # and the same six arrive twice. That is also true of every other crate the root manifest
+  # declares: `rsa` and `lopdf` moving will open two pull requests for one change, and closing the
+  # duplicate is the price of the two workspaces being separate.
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
@@ -32,6 +69,7 @@ updates:
     groups:
       patch-and-minor:
         update-types: [minor, patch]
+    ignore: *rustcrypto-generation
 
   # The front end. `pdfjs-dist` renders the page a signature is placed on, and a placement drawn
   # against a viewport that changed is a signature somewhere other than where it was drawn — so
