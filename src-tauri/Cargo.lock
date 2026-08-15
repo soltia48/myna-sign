@@ -2882,7 +2882,7 @@ version = "0.1.0"
 dependencies = [
  "ab_glyph",
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "cmpv2",
  "cms",
  "const-oid 0.9.6",
@@ -4135,7 +4135,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "argon2",
- "base64 0.22.1",
+ "base64 0.21.7",
  "block-padding 0.3.3",
  "blowfish",
  "buffered-reader",
