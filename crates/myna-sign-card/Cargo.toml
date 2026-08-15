@@ -1,0 +1,19 @@
+[package]
+name = "myna-sign-card"
+description = "The card side of myna-sign: PC/SC session handling and the CardSigner."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+myna-sign-core = { path = "../myna-sign-core" }
+myna-card = { workspace = true, features = ["pcsc", "verify"] }
+thiserror.workspace = true
+zeroize.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+# The hardware tests exercise the signer through the core trait.
+myna-sign-core = { path = "../myna-sign-core" }

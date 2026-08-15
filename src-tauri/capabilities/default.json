@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Only what the window needs: the file pickers, and the commands this application defines. There is deliberately no blanket filesystem permission — the paths the program reads and writes are the ones the user chose in a dialog, and the reading and writing happens in Rust.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-confirm"
+  ]
+}

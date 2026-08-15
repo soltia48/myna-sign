@@ -1,0 +1,43 @@
+# Its own workspace: building this needs the platform webview development packages, which the
+# library crates do not, so `cargo test` at the repository root does not drag them in.
+[workspace]
+
+[package]
+name = "myna-sign-app"
+description = "The myna-sign desktop application."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+repository = "https://github.com/soltia48/myna-sign"
+
+[lib]
+# Tauri's mobile targets want a library; the desktop binary is a thin wrapper over it.
+name = "myna_sign_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Embeds the built front end in the binary instead of loading it from the dev server named by
+# `build.devUrl`. Without it a release build still points at localhost:5173 and shows
+# "Connection refused" on any machine that is not running `npm run dev`.
+#
+# Not a default feature, because `cargo tauri dev` wants it off. `cargo tauri build` turns it on
+# for you; a plain `cargo build --release` does not, so name it:
+#
+#     cargo build --release --features custom-protocol
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+myna-sign-core = { path = "../crates/myna-sign-core", features = ["tsa-http"] }
+myna-sign-card = { path = "../crates/myna-sign-card" }
+myna-card = { version = "1.0", default-features = false, features = ["pcsc", "verify"] }
+
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zeroize = { version = "1.9", features = ["zeroize_derive"] }
+hex = "0.4"

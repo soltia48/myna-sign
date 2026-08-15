@@ -1,0 +1,20 @@
+[package]
+name = "myna-sign-cli"
+description = "A thin CLI over myna-sign-core, for CI cross-checks and manual runs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "myna-sign"
+path = "src/main.rs"
+
+[dependencies]
+myna-sign-core = { path = "../myna-sign-core", features = ["soft-signer", "tsa-http"] }
+myna-sign-card = { path = "../myna-sign-card" }
+myna-card.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+rpassword = "7"

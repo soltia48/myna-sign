@@ -1,0 +1,912 @@
+/*
+ * One stylesheet. The window is four screens of forms and results; a design system would be more
+ * machinery than the thing it dresses.
+ *
+ * The claim colours carry meaning, so they are also distinguished by the glyph in `.claim-mark` —
+ * a result that reads only as "green or red" is unreadable to a good number of people, and this
+ * one is about whether to trust a document. The same rule governs everything added since: the
+ * verdict groups and the unattributed block are told apart by a heading and a rule as well as by
+ * a tint.
+ *
+ * Sizes, radii and spacing are tokens rather than literals because the file had grown nine text
+ * sizes and five radii, which is not a system anyone can hold in their head — nothing about this
+ * window needs a 0.82em that is distinct from a 0.85em.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #d7dbe0;
+  --text: #14181d;
+  --muted: #5b6672;
+  --accent: #1f5fa9;
+
+  /* The foreground of a filled button. White on the dark accent is 2.46:1, which failed on the
+     one button that must never be misread: the submit of the password dialog at one try left.
+     Dark themes get the page background back as ink instead — 7.23:1 on the accent, 8.31:1 on
+     `--bad` — so no new hue enters the palette. */
+  --on-accent: #ffffff;
+
+  /* The edge of a control, which is information rather than decoration: `--border` is 1.39:1 on
+     the surface, so an input read as a floating label with no box. 4.06:1 here, against the 3:1
+     that a control boundary needs. */
+  --control-border: #767f8a;
+
+  --ok: #1c6b3c;
+  --warn: #8a5a00;
+  --bad: #a32020;
+  --unknown: #5b6672;
+  --ok-bg: #e8f4ec;
+  --warn-bg: #fdf2dd;
+  --bad-bg: #fbeaea;
+  --unknown-bg: #eef0f2;
+
+  /* Four steps. `--fs-sm` is the aside; body is 1rem; the two above it are headings. */
+  --fs-sm: 0.86rem;
+  --fs-lg: 1.05rem;
+  --fs-xl: 1.4rem;
+
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-pill: 999px;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 48px;
+
+  /* Roughly the height of the sticky tab strip, so that anything focused or jumped to does not
+     land underneath it. */
+  --tabs-height: 68px;
+
+  /* Drawn on the page image, which is white paper in both themes, so these do not follow the
+     theme: the dark accent is 2.46:1 on paper and the rectangle would be a rumour. 6.43:1 and
+     5.85:1 on white respectively. */
+  --paper-ink: #1f5fa9;
+  --paper-muted: #5b6672;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181d;
+    --surface: #1c2128;
+    --border: #303845;
+    --text: #e6e9ee;
+    --muted: #9aa5b1;
+    --accent: #6ea8f0;
+
+    --on-accent: #14181d;
+    --control-border: #7a8695;
+
+    --ok: #7fd6a2;
+    --warn: #e8c27a;
+    --bad: #f09a9a;
+    --unknown: #9aa5b1;
+    --ok-bg: #16281e;
+    --warn-bg: #2b2313;
+    --bad-bg: #2c1a1a;
+    --unknown-bg: #21262d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-padding-top: calc(var(--tabs-height) + var(--sp-2));
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 system-ui, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+}
+
+/* The user agent already shrinks `small`, and every use of it here also carried a class that set
+   a size; multiplied out they reached about 0.7em. The element is kept for what it says about the
+   text, and the size comes from the class alone. */
+small {
+  font-size: inherit;
+}
+
+/* Not a step on the scale: monospace renders optically larger at a given size, so it is corrected
+   relative to whatever it sits in. */
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
+/* Keyboard focus was invisible everywhere in this window, which makes the tab order unusable and
+   makes the password dialog impossible to operate without a mouse. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A filled button is already accent-coloured, and an accent ring two pixels off it reads as part
+   of the button rather than as focus. Text colour is the one ink that contrasts with the fill and
+   with the page behind it in both themes. */
+button:focus-visible {
+  outline-color: var(--text);
+}
+
+button.ghost:focus-visible,
+.tab:focus-visible,
+.copy:focus-visible {
+  outline-color: var(--accent);
+}
+
+/* Off-screen but spoken. `display: none` and `visibility: hidden` are skipped by screen readers,
+   which is the opposite of what this class is for. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* --- Navigation --- */
+
+.tabs {
+  display: flex;
+  gap: var(--sp-1);
+  position: sticky;
+  top: 0;
+  padding: var(--sp-3) 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  z-index: 5;
+}
+
+.tab {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab.active,
+.tabs [role="tab"][aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* --- Chrome --- */
+
+h1 {
+  font-size: var(--fs-xl);
+  margin: var(--sp-5) 0 var(--sp-4);
+}
+
+h2 {
+  font-size: var(--fs-lg);
+  margin: 0 0 var(--sp-3);
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 var(--sp-4) var(--sp-6);
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+
+button {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-4);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--control-border);
+}
+
+button.small {
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+button.danger {
+  background: var(--bad);
+}
+
+/* An action that destroys work, drawn as an outline. The filled red is reserved for the submit at
+   one try left, where the next mistake locks the card at a town hall counter; if every dangerous
+   button were filled red, that one would say nothing. */
+button.ghost.destructive {
+  background: transparent;
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.note {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.warn-box {
+  background: var(--warn-bg);
+  border-left: 3px solid var(--warn);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+}
+
+/* Why a button cannot be pressed, or what the card is doing while it is unpressable. Neutral: the
+   state is not a fault, and a red block would read as one. */
+.status-block {
+  background: var(--unknown-bg);
+  border-left: 3px solid var(--muted);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.status-block > :first-child {
+  margin-top: 0;
+}
+
+.status-block > :last-child {
+  margin-bottom: 0;
+}
+
+/* Nothing here yet, said in a box rather than in silence, so an empty list does not look like a
+   list that failed to load. */
+.empty {
+  border: 1px dashed var(--control-border);
+  border-radius: var(--r-md);
+  padding: var(--sp-5) var(--sp-4);
+  margin: 0 0 var(--sp-3);
+  text-align: center;
+  color: var(--muted);
+}
+
+.banner {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  margin-top: var(--sp-3);
+}
+
+.banner-info {
+  background: var(--unknown-bg);
+}
+.banner-warn {
+  background: var(--warn-bg);
+}
+.banner-error {
+  background: var(--bad-bg);
+}
+
+/* --- Forms --- */
+
+.field {
+  display: block;
+  margin-bottom: var(--sp-3);
+}
+
+.field > span {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-bottom: var(--sp-1);
+}
+
+.field input,
+.page-jump input {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  min-width: 0;
+}
+
+.field input {
+  width: 100%;
+}
+
+/* The page number is a number, not a sentence. Under `.field` it inherited a full-width box that
+   invited a filename, so it has its own class; the input stays on the control row. */
+.page-jump {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.page-jump > span {
+  display: inline;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.page-jump input {
+  width: 4.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.check {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  margin-bottom: var(--sp-3);
+}
+
+/* The default 13px box is a small target for a choice that discloses an address. */
+.check input {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  margin: 0.25em 0 0;
+}
+
+.check small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+input[type="checkbox"],
+input[type="radio"],
+progress {
+  accent-color: var(--accent);
+}
+
+/* Copies a digest or a path. Stands on its own rather than borrowing the filled button, which
+   would give a clipboard the visual weight of "sign". */
+.copy {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-sm);
+  padding: var(--sp-1) var(--sp-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+/* --- Claims --- */
+
+.claim {
+  display: grid;
+  grid-template-columns: 22px 11em 1fr;
+  gap: var(--sp-2);
+  align-items: baseline;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.claim:last-child {
+  border-bottom: none;
+}
+
+.claim-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.claim-ok .claim-mark {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.claim-warn .claim-mark {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.claim-bad .claim-mark {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.claim-unknown .claim-mark {
+  background: var(--unknown-bg);
+  color: var(--unknown);
+}
+
+.claim-label {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* The claims sorted into what verified, what needs attention, what failed, and what was never
+   checked. A tint alone would leave the groups indistinguishable to a reader who does not see the
+   difference, so each one also carries a rule down its edge and a heading that names it. */
+.verdict-group {
+  border-left: 3px solid var(--unknown);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--unknown-bg);
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.verdict-group-head,
+.verdict-group > h3,
+.unattributed > h3 {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* The disc behind the glyph is tinted with the group's own colour, so inside a group it would
+   vanish into the background. The surface gives the glyph an edge to sit on again. */
+.verdict-group .claim-mark {
+  background: var(--surface);
+}
+
+.verdict-group.g-ok {
+  border-left-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.verdict-group.g-ok .verdict-group-head,
+.verdict-group.g-ok > h3 {
+  color: var(--ok);
+}
+
+.verdict-group.g-warn {
+  border-left-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.verdict-group.g-warn .verdict-group-head,
+.verdict-group.g-warn > h3 {
+  color: var(--warn);
+}
+
+.verdict-group.g-bad {
+  border-left-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.verdict-group.g-bad .verdict-group-head,
+.verdict-group.g-bad > h3 {
+  color: var(--bad);
+}
+
+/* Not red, and not solid. Nothing here failed — these are the checks this program does not make,
+   and revocation is always one of them. A dashed rule says the question is open; a red one would
+   say the answer came back bad. */
+.verdict-group.g-unknown {
+  border-left-style: dashed;
+  border-left-color: var(--unknown);
+  background: var(--unknown-bg);
+}
+
+.verdict-group.g-unknown .verdict-group-head,
+.verdict-group.g-unknown > h3 {
+  color: var(--unknown);
+}
+
+/* Checks that passed about something other than this document — a timestamp that is genuine but
+   covers a different digest, a certificate that is sound but is not bound to these bytes. The
+   glyphs stay ✓ because those checks did pass, so the container has to carry the qualification:
+   recessed against the panel, ruled in neutral, and headed by a sentence that says so. */
+.unattributed {
+  border-left: 3px dotted var(--muted);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--bg);
+  padding: var(--sp-2) var(--sp-3);
+  margin: var(--sp-3) 0 0;
+}
+
+.unattributed .verdict-group-head,
+.unattributed > h3 {
+  color: var(--muted);
+}
+
+.badge-test,
+.planned-badge {
+  display: inline-block;
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.badge-test {
+  margin-left: var(--sp-2);
+}
+
+/* A character the certificate could not spell, marked where it occurs. A note below the name
+   would be read as being about the whole name. */
+.substitute-mark {
+  text-decoration: underline dotted var(--warn);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.chain {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.holder {
+  display: grid;
+  grid-template-columns: 9em 1fr;
+  gap: var(--sp-1) var(--sp-3);
+  margin: var(--sp-3) 0 0;
+}
+
+.holder dt {
+  color: var(--muted);
+}
+
+.holder dd {
+  margin: 0;
+}
+
+/* These boxes hold the sentences about what a signature gives away and about a signature that has
+   not reached the disk. They sit one step below body text so the box reads as an aside — and no
+   further, because they are the sentences a signer has to actually read. */
+.warn-box,
+.error,
+.holder,
+.disclosure {
+  font-size: 0.92rem;
+}
+
+.readers,
+.files {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--sp-4);
+}
+
+.readers li,
+.files li {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* What signing would put on the disk, shown before it happens rather than reported afterwards. */
+.planned {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.planned-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-1) var(--sp-3);
+  align-items: baseline;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.planned-row:last-child {
+  border-bottom: none;
+}
+
+.planned-badge {
+  justify-self: end;
+}
+
+/* --- Progress --- */
+
+.progress-row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-row strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.progress-row progress {
+  flex: 1 1 10em;
+  height: 6px;
+  border-radius: var(--r-xs);
+}
+
+/* --- The password dialog --- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  z-index: 20;
+}
+
+.dialog {
+  background: var(--surface);
+  border-radius: var(--r-md);
+  padding: var(--sp-5);
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.dialog h2 {
+  margin-top: 0;
+}
+
+.subject {
+  background: var(--unknown-bg);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.subject-lead {
+  margin: 0 0 var(--sp-2);
+  font-weight: 600;
+}
+
+.subject ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.subject li {
+  padding: var(--sp-1) 0;
+}
+
+.subject-name {
+  display: block;
+  font-weight: 500;
+}
+
+.digest {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* What this signature will hand over, and to whom. Warning-coloured like `.warn-box` but its own
+   block: it is a list of consequences, not a remark, and it is the last thing shown before a
+   password is typed. */
+.disclosure {
+  background: var(--warn-bg);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+  margin: 0 0 var(--sp-4);
+}
+
+.disclosure dt {
+  font-weight: 600;
+}
+
+.disclosure dd {
+  margin: 0 0 var(--sp-2);
+}
+
+.disclosure dd:last-child {
+  margin-bottom: 0;
+}
+
+/* Kept at body size. It says how many attempts are left before a town hall visit. */
+.retries {
+  color: var(--muted);
+}
+
+.retries.danger {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.error {
+  background: var(--bad-bg);
+  color: var(--bad);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+.probe {
+  color: var(--muted);
+}
+
+.result + .result {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+/* --- Signature placement --- */
+
+.placement {
+  margin-top: var(--sp-3);
+}
+
+.placement-controls .spacer {
+  flex: 1;
+}
+
+.page-of,
+.zoom-of {
+  min-width: 3.5em;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The document scrolls; pages never shrink. A canvas displayed smaller than it was rendered
+   would put the signature somewhere other than where it was drawn. */
+.page-viewport {
+  overflow: auto;
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-sm);
+  background: var(--unknown-bg);
+  min-height: 200px;
+  padding: var(--sp-3);
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.page-slot {
+  position: relative;
+  flex: none;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+  /* A drag places the signature rather than selecting text or panning. */
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.page-slot.chosen {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.page-canvas {
+  display: block;
+}
+
+/* Shown through the blank slot of a page that has scrolled out and been released, so an empty
+   rectangle still reads as a page rather than as a gap. It used to be faded to 0.6, which left
+   the only label on a blank page too faint to read. */
+.page-number {
+  position: absolute;
+  right: var(--sp-2);
+  bottom: var(--sp-1);
+  color: var(--paper-muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-loading-inline {
+  margin: 0;
+  padding: var(--sp-6) 0;
+  color: var(--muted);
+}
+
+.page-box {
+  position: absolute;
+  border: 2px solid var(--paper-ink);
+  background: rgb(31 95 169 / 0.12);
+  pointer-events: none;
+}
+
+.page-stamp {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.85;
+}
+
+/* A rectangle the signer has not chosen: where the signature would land if they do nothing. The
+   dashes and the lighter fill say it is a proposal; the tag says which one, because a dashed
+   rectangle on its own is just as easily a rectangle being drawn. */
+.page-box.provisional {
+  border-style: dashed;
+  background: rgb(31 95 169 / 0.06);
+}
+
+.page-box-tag {
+  position: absolute;
+  top: -1.6em;
+  left: -2px;
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-xs);
+  background: var(--paper-ink);
+  color: #ffffff;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  /* The tag sits over page content, which can be anything. */
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}

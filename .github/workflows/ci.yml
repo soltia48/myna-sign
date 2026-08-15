@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # A signing bug that only shows up in release is not a bug anyone wants to find later.
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # Everything below the card runs without hardware, so it runs everywhere and runs first.
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      # `pcsc` links against libpcsclite; macOS and Windows carry PC/SC themselves.
+      - name: PC/SC headers
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcsclite-dev
+
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --features myna-sign-core/soft-signer
+      - run: cargo test --workspace --features myna-sign-core/soft-signer
+
+  # The signatures are only as right as an outside implementation says they are.
+  interop:
+    name: Cross-check against gpg, pdfsig and openssl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Tools that judge our output
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcsclite-dev gnupg poppler-utils openssl
+      - run: cargo test --workspace --features myna-sign-core/soft-signer
+
+      # Reaches two real timestamp authorities. Allowed to fail: an authority being down is not a
+      # defect in this repository, and a red build for it would train people to ignore red builds.
+      - name: Timestamp authorities (network)
+        continue-on-error: true
+        run: cargo test -p myna-sign-core --features soft-signer -- --ignored
+
+  # The application is a separate workspace and needs the platform webview toolchain.
+  app:
+    name: App (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-14        # Apple Silicon
+          - os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Linux webview and PC/SC
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf \
+            libpcsclite-dev
+
+      - run: npm ci
+        working-directory: ui
+      - run: npm run build
+        working-directory: ui
+
+      # `custom-protocol` is what embeds the front end. Without it the binary points at the dev
+      # server and shows "Connection refused" on any machine that is not running `npm run dev`.
+      - run: cargo build --release --features custom-protocol
+        working-directory: src-tauri
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: myna-sign-${{ matrix.os }}
+          path: |
+            src-tauri/target/release/myna-sign-app
+            src-tauri/target/release/myna-sign-app.exe
+          if-no-files-found: error
+
+  # The one thing CI cannot do. Kept visible so it does not quietly become "nobody checked".
+  hardware:
+    name: Needs a card (not run in CI)
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "These need a reader and a card, so they are run by hand:"
+          echo
+          echo "  cargo test -p myna-sign-card -- --ignored --test-threads=1"
+          echo
+          echo "The important one is powering_the_card_down_clears_the_security_status:"
+          echo "whether SCARD_UNPOWER_CARD really clears the security status is up to the"
+          echo "driver, and if it does not, closing the application leaves the signature key"
+          echo "unlocked. It must be checked on Linux, macOS and Windows separately."

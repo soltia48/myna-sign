@@ -1,0 +1,58 @@
+[package]
+name = "myna-sign-core"
+description = "Signing and verification for myna-sign: OpenPGP, PDF, RFC 3161. No card, no GUI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# `verify` gives Certificate and the J-LIS roots. No `pcsc`: nothing here talks to a reader.
+myna-card = { workspace = true, features = ["verify"] }
+
+thiserror.workspace = true
+sha2.workspace = true
+rsa.workspace = true
+p256.workspace = true
+p384.workspace = true
+p521.workspace = true
+signature.workspace = true
+serde.workspace = true
+hex.workspace = true
+base64.workspace = true
+
+der.workspace = true
+const-oid.workspace = true
+spki.workspace = true
+x509-cert.workspace = true
+cms.workspace = true
+x509-tsp.workspace = true
+lopdf.workspace = true
+image.workspace = true
+ab_glyph.workspace = true
+sequoia-openpgp.workspace = true
+
+rand.workspace = true
+webpki-roots.workspace = true
+cmpv2.workspace = true
+anyhow.workspace = true
+ureq = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Every test below the card layer runs against the software key.
+myna-sign-core = { path = ".", features = ["soft-signer"] }
+base64.workspace = true
+# Tests only. `TsaConfig` is shaped by how it crosses to the interface as JSON, and a test that
+# cannot parse JSON cannot see the field names that shape is about.
+serde_json.workspace = true
+
+[features]
+default = ["tsa-http"]
+# A software RSA key that implements `DigestSigner`, so that everything above the card can be
+# built and tested without hardware. Not a fallback for users without a card: it holds a private
+# key in memory, which is the thing the card exists to avoid.
+soft-signer = ["x509-cert/builder"]
+# A blocking HTTP client for talking to a timestamp authority. Without it the RFC 3161 protocol is
+# still here; only the transport is missing, and a caller supplies its own via `tsa::HttpPost`.
+tsa-http = ["dep:ureq"]

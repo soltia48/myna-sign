@@ -1,0 +1,66 @@
+[workspace]
+resolver = "3"
+members = ["crates/myna-sign-core", "crates/myna-sign-card", "crates/myna-sign-cli"]
+# The Tauri application is deliberately outside the default members: building it needs the
+# platform webview development packages (webkit2gtk on Linux), which the library crates do not.
+# `cargo test` on a machine without them still exercises everything that matters.
+exclude = ["src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+repository = "https://github.com/soltia48/myna-sign"
+
+[workspace.dependencies]
+# The card. `myna-sign-core` takes it without the PC/SC backend: it needs the JPKI X.509
+# certificate type and the J-LIS roots, both of which live behind `verify` and neither of which
+# talks to a reader. Only `myna-sign-card` turns `pcsc` on.
+myna-card = { version = "1.0", default-features = false }
+
+thiserror = "2"
+sha2 = "0.10"
+rsa = "0.9"
+# Verification meets algorithms the card never produces: a real FreeTSA token is ECDSA on P-384.
+# These are already in the tree via sequoia's RustCrypto backend, so they cost nothing new.
+p256 = "0.13"
+p384 = "0.13"
+p521 = "0.13"
+signature = "2"
+zeroize = { version = "1.9", features = ["zeroize_derive"] }
+serde = { version = "1", features = ["derive"] }
+hex = "0.4"
+rand = "0.8"
+webpki-roots = "1.0"
+cmpv2 = "0.2"
+# sequoia hands back `anyhow::Error`; naming it is better than stringifying at every call site.
+anyhow = "1"
+# Blocking HTTP for the timestamp authority. rustls with the ring backend (ureq's `rustls`
+# feature) rather than aws-lc-rs: no cmake, no C toolchain, which is what makes the Windows and
+# macOS builds ordinary. Optional — the protocol works without any client at all.
+ureq = { version = "3.4", default-features = false, features = ["rustls"] }
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
+serde_json = "1"
+
+# The `der` 0.7 world: cms, x509-tsp and the x509-cert they share. Kept apart from the `der` 0.8
+# that myna-card's x509-cert 0.3 brings; see docs/DESIGN.md §3.1. Only DER bytes cross between.
+der = { version = "0.7", features = ["derive", "oid"] }
+const-oid = { version = "0.9", features = ["db"] }
+spki = "0.7"
+x509-cert = "0.2"
+cms = { version = "0.2", features = ["builder"] }
+x509-tsp = "0.1"
+lopdf = { version = "0.44", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+ab_glyph = "0.2"
+
+# OpenPGP. The RustCrypto backend rather than nettle: nettle wants GMP, which makes the Windows
+# build awkward, and this crate holds no private key in software for a variable-time
+# implementation to leak. See docs/DESIGN.md §3.2.
+sequoia-openpgp = { version = "2.4", default-features = false, features = [
+    "crypto-rust",
+    "allow-experimental-crypto",
+    "allow-variable-time-crypto",
+] }
