@@ -48,7 +48,7 @@ clap = { version = "4", features = ["derive"] }
 serde_json = "1"
 
 # The `der` 0.7 world: cms, x509-tsp and the x509-cert they share. Kept apart from the `der` 0.8
-# that myna-card's x509-cert 0.3 brings; see docs/DESIGN.md §3.1. Only DER bytes cross between.
+# that myna-card's x509-cert 0.3 brings. Only DER bytes cross between.
 #
 # `const-oid` is not among them, and not by omission. Every OID here is written as
 # `der::asn1::ObjectIdentifier`, which is the one `der` 0.7 re-exports; naming the crate separately
@@ -64,7 +64,7 @@ ab_glyph = "0.2"
 
 # OpenPGP. The RustCrypto backend rather than nettle: nettle wants GMP, which makes the Windows
 # build awkward, and this crate holds no private key in software for a variable-time
-# implementation to leak. See docs/DESIGN.md §3.2.
+# implementation to leak.
 sequoia-openpgp = { version = "2.4", default-features = false, features = [
     "crypto-rust",
     "allow-experimental-crypto",

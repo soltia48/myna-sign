@@ -33,6 +33,5 @@ pub use signer::DigestSigner;
 
 /// The X.509 certificate type used throughout, re-exported from `myna-card`.
 ///
-/// This is the `x509-cert` 0.3 world. The CMS code re-parses the same DER with `x509-cert` 0.2;
-/// see `docs/DESIGN.md` §3.1 for why the two majors coexist and what may cross between them.
+/// This is the `x509-cert` 0.3 world. The CMS code re-parses the same DER with `x509-cert` 0.2.
 pub use myna_card::Certificate;

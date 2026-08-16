@@ -2,7 +2,7 @@ name: Release
 
 # Tag a commit to release it:
 #
-#     git tag v1.0.0 && git push origin v
+#     git tag v1.0.0 && git push origin v0.1.0
 #
 # The tag has to match the version, which this project states in three places — the workspace
 # manifest, the application manifest, and `tauri.conf.json`, whose copy is the one that ends up in
@@ -12,10 +12,6 @@ name: Release
 # The jobs run in this order, and the order is the point:
 #
 #     verify ──► bundle (ubuntu, macOS, Windows) ──► a draft release
-#
-# The release is left as a draft. Nothing here is signed or notarised yet, so somebody has to
-# decide that shipping a binary macOS will call unidentified and Windows will call unrecognised is
-# what they meant to do. See DESIGN.md 10.3.
 on:
   push:
     tags: ["v*"]

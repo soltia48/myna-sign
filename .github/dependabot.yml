@@ -24,8 +24,7 @@ updates:
     # The RustCrypto generation this project is pinned to, and why it cannot move a crate at a time.
     #
     # `cms` 0.2 and `x509-tsp` 0.1 are the newest releases of either, and both are built on `der`
-    # 0.7 and `x509-cert` 0.2. Everything below is in that same world by necessity — see the
-    # comment above `[workspace.dependencies]` in Cargo.toml and DESIGN.md §3.1. Taking any one of
+    # 0.7 and `x509-cert` 0.2. Everything below is in that same world by necessity. Taking any one of
     # them to the new generation on its own does not produce a version conflict, it produces a type
     # error: 107 of them for `x509-cert` alone, 174 for `der`.
     #

@@ -1453,7 +1453,7 @@ function verifiedPath(outcome: VerifyOutcome): string {
  *
  * `coversWholeFile` is deliberately not one of the conditions. A revision appended after a
  * signature is how a second signer signs the same document, and refusing to name the first signer
- * over it would break the one thing PDF signatures exist to allow (DESIGN.md §7.2). It is reported
+ * over it would break the one thing PDF signatures exist to allow. It is reported
  * as its own claim instead.
  *
  * Worked out once and used twice — on the screen and in the exported text — because a file that

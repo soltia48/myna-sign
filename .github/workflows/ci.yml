@@ -179,8 +179,6 @@ jobs:
 
       # Each interop test skips when the tool it needs is missing, which is right for a laptop and
       # wrong here: a job that silently checked nothing would look exactly like a job that passed.
-      # DESIGN.md §12 makes outside verification the evidence that the formats are correct, so the
-      # tools being present is itself part of what this job asserts.
       - name: The judges have to actually be here
         run: |
           set -euo pipefail
@@ -373,7 +371,7 @@ jobs:
           echo "  powering_the_card_down_clears_the_security_status"
           echo "    Whether SCARD_UNPOWER_CARD really clears the security status is up to the"
           echo "    driver. If it does not, closing the application leaves the signature key"
-          echo "    unlocked. Check on Linux, macOS and Windows separately (DESIGN.md 10.2)."
+          echo "    unlocked. Check on Linux, macOS and Windows separately."
           echo
           echo "  an_exclusive_session_locks_other_connections_out"
           echo "    Whether SCARD_SHARE_EXCLUSIVE keeps other processes out is also the driver's"

@@ -17,7 +17,7 @@
 //!
 //! Everything below reads the DER with `x509-cert` 0.2, the same major the CMS code uses, rather
 //! than the 0.3 that `myna-card` exposes through [`Certificate::inner`]. Re-parsing costs a
-//! microsecond and keeps one ASN.1 world in this crate instead of two; see `docs/DESIGN.md` §3.1.
+//! microsecond and keeps one ASN.1 world in this crate instead of two.
 
 use der::asn1::ObjectIdentifier;
 use der::{Decode as _, Encode as _};
