@@ -278,15 +278,7 @@ fn run(cli: &Cli) -> Result<()> {
             } else {
                 let certificate =
                     myna_sign_core::x509::CertificateInfo::read(signer.certificate())?;
-                Some(
-                    pdf::SignatureBlock::describe(
-                        &certificate,
-                        Timestamp::now()?,
-                        reason.as_deref(),
-                        location.as_deref(),
-                    )
-                    .render()?,
-                )
+                Some(pdf::SignatureBlock::describe(&certificate, Timestamp::now()?).render()?)
             };
 
             let appearance = match drawn {

@@ -526,12 +526,7 @@ export function SignScreen() {
     if (!isPdf || invisibleSignature.value || options.placed) return;
     let cancelled = false;
     api
-      .defaultSignaturePlacement(
-        files[0],
-        options.imagePath,
-        options.reason || null,
-        options.location || null,
-      )
+      .defaultSignaturePlacement(files[0], options.imagePath)
       .then((placement) => {
         if (cancelled || pdfOptions.value.placed) return;
         pdfOptions.value = {
@@ -1084,7 +1079,7 @@ export function SignScreen() {
         <div class="panel">
           <h2>PDF 署名</h2>
           <p class="warn-box">
-            この PDF には署名用電子証明書が必ず同梱され、受け取った人は氏名・住所・生年月日・性別を読み出せます。外す選択肢はありません（外すと誰も検証できなくなるためです）。
+            この PDF には署名用電子証明書が必ず同梱され、受け取った人は氏名・住所・生年月日・性別を読み出せます。外す選択肢はありません（外すと誰も検証できなくなるためです）。署名欄には氏名と住所が印字されます。
           </p>
           <label class="field">
             <span>理由</span>
@@ -1111,7 +1106,7 @@ export function SignScreen() {
             <span>
               署名をページに表示しない
               <small>
-                既定では、署名者名・日時・証明書の指紋（および入力した理由・場所）を記した枠がページに描かれます。これを選ぶと、ページ上には何も現れません。ただし枠に出るのは氏名だけで、住所・生年月日・性別を含む証明書は、枠の有無にかかわらず文書に入ります。見えないだけで、隠されているわけではありません。
+                既定では、証明書の氏名・住所と日時を記した署名欄がページに描かれます。これを選ぶと、ページ上には何も現れません。ただし生年月日・性別を含む証明書は、枠の有無にかかわらず文書に入ります。見えないだけで、隠されているわけではありません。
               </small>
             </span>
           </label>
@@ -1138,10 +1133,6 @@ export function SignScreen() {
             <PdfPlacement
               path={files[0]}
               imagePath={options.imagePath}
-              panel={{
-                reason: options.reason || null,
-                location: options.location || null,
-              }}
               page={options.page}
               rect={options.rect}
               provisional={!options.placed}

@@ -727,14 +727,10 @@ fn pdfsig_accepts_a_signature_with_a_generated_panel() {
 
     let mut signer = soft_signer();
     let certificate = CertificateInfo::read(signer.certificate()).unwrap();
-    let panel = pdf::SignatureBlock::describe(
-        &certificate,
-        Timestamp::from_unix_seconds(1_786_775_188),
-        Some("承認"),
-        Some("東京"),
-    )
-    .render()
-    .unwrap();
+    let panel =
+        pdf::SignatureBlock::describe(&certificate, Timestamp::from_unix_seconds(1_786_775_188))
+            .render()
+            .unwrap();
 
     // Placed by its own proportions, in the corner, because nobody dragged a rectangle.
     let appearance = pdf::default_placement(&original, 1, &panel).unwrap();
@@ -778,8 +774,9 @@ fn a_stamp_keeps_its_proportions_in_a_field_of_a_different_shape() {
 
     // A wide panel dropped into a tall, narrow rectangle.
     let panel = pdf::SignatureBlock {
-        title: "電子署名".into(),
-        rows: vec![("署名者".into(), "黒桐　幹也".into())],
+        name: "黒桐　幹也".into(),
+        when: "2026-08-16 09:35 JST".into(),
+        ..Default::default()
     }
     .render()
     .unwrap();

@@ -51,8 +51,6 @@ interface Props {
   path: string;
   /** The signer's own stamp image, or nothing for the drawn panel. */
   imagePath: string | null;
-  /** What the panel would say, when there is no image of the signer's own. */
-  panel: { reason: string | null; location: string | null } | null;
   page: number;
   rect: Rect | null;
   /// Whether `rect` is the default rather than somewhere the signer chose.
@@ -132,7 +130,6 @@ interface PageSize {
 export function PdfPlacement({
   path,
   imagePath,
-  panel,
   page,
   rect,
   provisional,
@@ -181,9 +178,7 @@ export function PdfPlacement({
     let created: string | null = null;
     const wanted = imagePath
       ? api.readFile(imagePath)
-      : panel
-        ? api.previewSignaturePanel(panel.reason, panel.location)
-        : null;
+      : api.previewSignaturePanel();
     if (!wanted) {
       setImageUrl(null);
       return;
@@ -197,7 +192,7 @@ export function PdfPlacement({
     return () => {
       if (created) URL.revokeObjectURL(created);
     };
-  }, [imagePath, panel?.reason, panel?.location]);
+  }, [imagePath]);
 
   // Load the document and work out how tall the whole thing is.
   useEffect(() => {
@@ -505,12 +500,7 @@ export function PdfPlacement({
       return;
     }
     try {
-      const placement = await api.defaultSignaturePlacement(
-        path,
-        imagePath,
-        panel?.reason ?? null,
-        panel?.location ?? null,
-      );
+      const placement = await api.defaultSignaturePlacement(path, imagePath);
       onChange(n, fitInto(placement.rect, size.bounds));
     } catch {
       notify("error", "既定の署名位置を取得できませんでした。ドラッグで指定してください。");
@@ -520,12 +510,7 @@ export function PdfPlacement({
   /** Back to wherever the signing path would put it on its own. */
   async function resetToDefault() {
     try {
-      const placement = await api.defaultSignaturePlacement(
-        path,
-        imagePath,
-        panel?.reason ?? null,
-        panel?.location ?? null,
-      );
+      const placement = await api.defaultSignaturePlacement(path, imagePath);
       onChange(placement.page, placement.rect, false);
       moveFocus(placement.page);
     } catch {

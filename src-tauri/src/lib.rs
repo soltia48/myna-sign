@@ -1006,53 +1006,29 @@ pub struct AppearanceRequest {
 ///
 /// Uses the 署名用証明書 once the password has been presented. Before that the holder's name is
 /// not readable — it is behind the password — so the preview says so rather than inventing one.
-fn signature_panel(
-    state: &AppState,
-    reason: Option<&str>,
-    location: Option<&str>,
-) -> Result<pdf::SignatureImage> {
+fn signature_panel(state: &AppState) -> Result<pdf::SignatureImage> {
     let known = state.signer.lock().expect("poisoned").clone();
     let block = match known {
-        Some(certificate) => {
-            pdf::SignatureBlock::describe(&certificate, Timestamp::now()?, reason, location)
-        }
-        None => {
-            let mut rows = vec![
-                (
-                    "署名者".to_string(),
-                    "（カードから取得されます）".to_string(),
-                ),
-                (
-                    "日時".to_string(),
-                    Timestamp::now()?.to_rfc3339()[..16].replace('T', " ") + " UTC",
-                ),
-            ];
-            for (label, value) in [("理由", reason), ("場所", location)] {
-                if let Some(value) = value.filter(|v| !v.trim().is_empty()) {
-                    rows.push((label.to_string(), value.to_string()));
-                }
-            }
-            pdf::SignatureBlock {
-                title: "電子署名".into(),
-                rows,
-            }
-        }
+        Some(certificate) => pdf::SignatureBlock::describe(&certificate, Timestamp::now()?),
+        // The 氏名 and 住所 are both behind the password, so the preview says where they will come
+        // from rather than inventing them. It stands in for the name because that is the line the
+        // block is sized around; an invented address would change the shape as well as the words.
+        None => pdf::SignatureBlock {
+            name: "（カードから取得されます）".into(),
+            when: Timestamp::now()?.to_jst_minutes(),
+            ..Default::default()
+        },
     };
     Ok(block.render()?)
 }
 
 /// What would be drawn on the page: the signer's image, or the panel.
-fn drawn_image(
-    state: &AppState,
-    image_path: Option<&str>,
-    reason: Option<&str>,
-    location: Option<&str>,
-) -> Result<pdf::SignatureImage> {
+fn drawn_image(state: &AppState, image_path: Option<&str>) -> Result<pdf::SignatureImage> {
     match image_path {
         Some(path) => Ok(pdf::SignatureImage::from_bytes(
             std::fs::read(path).map_err(|e| read_error(path, e))?,
         )),
-        None => signature_panel(state, reason, location),
+        None => signature_panel(state),
     }
 }
 
@@ -1066,16 +1042,9 @@ async fn default_signature_placement(
     state: tauri::State<'_, AppState>,
     path: String,
     image_path: Option<String>,
-    reason: Option<String>,
-    location: Option<String>,
 ) -> Result<AppearanceRequest> {
     let pdf_bytes = std::fs::read(&path).map_err(|e| read_error(&path, e))?;
-    let image = drawn_image(
-        &state,
-        image_path.as_deref(),
-        reason.as_deref(),
-        location.as_deref(),
-    )?;
+    let image = drawn_image(&state, image_path.as_deref())?;
     let appearance = pdf::default_placement(&pdf_bytes, 1, &image)?;
     Ok(AppearanceRequest {
         page: appearance.page,
@@ -1088,10 +1057,8 @@ async fn default_signature_placement(
 #[tauri::command]
 async fn preview_signature_panel(
     state: tauri::State<'_, AppState>,
-    reason: Option<String>,
-    location: Option<String>,
 ) -> Result<tauri::ipc::Response> {
-    let image = signature_panel(&state, reason.as_deref(), location.as_deref())?;
+    let image = signature_panel(&state)?;
     Ok(tauri::ipc::Response::new(image.bytes))
 }
 
@@ -1118,11 +1085,7 @@ async fn sign_pdf(
             Some(path) => pdf::SignatureImage::from_bytes(
                 std::fs::read(path).map_err(|e| read_error(path, e))?,
             ),
-            None => signature_panel(
-                &state,
-                request.reason.as_deref(),
-                request.location.as_deref(),
-            )?,
+            None => signature_panel(&state)?,
         };
         Some(match &request.appearance {
             Some(a) => pdf::Appearance {

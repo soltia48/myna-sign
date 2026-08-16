@@ -534,19 +534,19 @@ export const api = {
   /** Raw bytes, for the placement view to render. The window has no filesystem access of its own. */
   readFile: (path: string) => invoke<ArrayBuffer>("read_file", { path }),
 
-  /** The panel that will be drawn on the page when the signer supplies no image of their own. */
-  previewSignaturePanel: (reason: string | null, location: string | null) =>
-    invoke<ArrayBuffer>("preview_signature_panel", { reason, location }),
+  /**
+   * The panel that will be drawn on the page when the signer supplies no image of their own.
+   *
+   * It takes nothing: the panel is 氏名 and 住所 from the certificate, and the time. The reason and
+   * the location are in the signature dictionary rather than on the page — a row costs the other
+   * rows their size, and those two are the ones a reader is least likely to be looking for.
+   */
+  previewSignaturePanel: () => invoke<ArrayBuffer>("preview_signature_panel"),
 
   /** Where the signature goes if the signer places it nowhere. */
-  defaultSignaturePlacement: (
-    path: string,
-    imagePath: string | null,
-    reason: string | null,
-    location: string | null,
-  ) =>
+  defaultSignaturePlacement: (path: string, imagePath: string | null) =>
     invoke<{ page: number; rect: [number, number, number, number] }>(
       "default_signature_placement",
-      { path, imagePath, reason, location },
+      { path, imagePath },
     ),
 };

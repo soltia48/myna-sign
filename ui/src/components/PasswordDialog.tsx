@@ -86,7 +86,15 @@ function disclosureLines(
     if (disclosure.nameOnPage) {
       lines.push({
         term: "ページ上の署名欄",
-        body: "さらに、ページ上の署名欄に氏名が印字されます。",
+        // Said here and in general terms because it has to be said before the password: the
+        // certificate is what carries the substitutes, and it is not readable until afterwards.
+        // The specific characters are marked on the card screen once it has been read.
+        body: (
+          <>
+            さらに、ページ上の署名欄に<strong>氏名と住所</strong>が印字されます。証明書の表記には
+            戸籍と異なる代替文字が使われていることがあります。
+          </>
+        ),
       });
     }
   } else {
