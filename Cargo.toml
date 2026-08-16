@@ -49,8 +49,11 @@ serde_json = "1"
 
 # The `der` 0.7 world: cms, x509-tsp and the x509-cert they share. Kept apart from the `der` 0.8
 # that myna-card's x509-cert 0.3 brings; see docs/DESIGN.md §3.1. Only DER bytes cross between.
+#
+# `const-oid` is not among them, and not by omission. Every OID here is written as
+# `der::asn1::ObjectIdentifier`, which is the one `der` 0.7 re-exports; naming the crate separately
+# only offered a second `ObjectIdentifier` that none of these structures would accept.
 der = { version = "0.7", features = ["derive", "oid"] }
-const-oid = { version = "0.9", features = ["db"] }
 spki = "0.7"
 x509-cert = "0.2"
 cms = { version = "0.2", features = ["builder"] }

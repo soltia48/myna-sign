@@ -29,6 +29,12 @@ updates:
     # them to the new generation on its own does not produce a version conflict, it produces a type
     # error: 107 of them for `x509-cert` alone, 174 for `der`.
     #
+    # The list is the generation, not the pull requests that happened to be open when it was
+    # written. Naming only what Dependabot had proposed is how the first version of this missed
+    # `p256`, `p384` and `rand`, and got them all again a month later. `rand` is here because
+    # `signature` 3 and the 0.14 elliptic curves take `rand_core` 0.10 with them; the curves are
+    # not decoration either, since a real FreeTSA token is ECDSA on P-384.
+    #
     # Note the update types. These are 0.x crates, so `0.7 -> 0.8` leaves the major at zero and
     # Dependabot calls it a *minor* update; blocking only `semver-major` would let every one of
     # them through. `signature` is past 1.0 and is the one that means what it says. Patch updates
@@ -51,6 +57,12 @@ updates:
       - dependency-name: sha2
         update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: p521
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: p256
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: p384
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: rand
         update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: signature
         update-types: [version-update:semver-major]
@@ -86,6 +98,12 @@ updates:
       - dependency-name: sha2
         update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: p521
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: p256
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: p384
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: rand
         update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: signature
         update-types: [version-update:semver-major]
