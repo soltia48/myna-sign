@@ -2,7 +2,7 @@ name: Release
 
 # Tag a commit to release it:
 #
-#     git tag v0.1.0 && git push origin v0.1.0
+#     git tag v1.0.0 && git push origin v
 #
 # The tag has to match the version, which this project states in three places — the workspace
 # manifest, the application manifest, and `tauri.conf.json`, whose copy is the one that ends up in
