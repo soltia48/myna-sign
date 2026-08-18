@@ -8,9 +8,11 @@
 //! **The password never becomes a long-lived value.** It arrives as a `String` over IPC, is moved
 //! into the card layer, and is zeroed there. It is never stored, never logged, and never returned.
 //!
-//! **The card is powered down when the session ends.** A successful VERIFY survives the process,
-//! so [`disconnect`] and the exit handler both power-cycle the card. Closing the window without
-//! that would leave the signature key unlocked for whatever talks to the card next.
+//! **The JPKI security status is cleared when the session ends.** A successful VERIFY survives the
+//! process and a plain reconnect, so [`disconnect`] and the exit handler select the master-file
+//! state before dropping the connection. Leaving the JPKI application clears its status without
+//! interrupting power; omitting that step would leave the signature key unlocked for whatever
+//! talks to the card next.
 
 // This crate is never published, and the people its documentation is for are the people who
 // maintain it. A doc link to a private command or to `AppState::with_session` points exactly
@@ -206,9 +208,9 @@ impl AppState {
 
     /// Drop a session whose card has gone.
     ///
-    /// Not [`disconnect`]: there is nothing to power down, because the card that would have been
-    /// cleared is no longer in the reader. Letting the session go is what makes the next call say
-    /// `NotConnected` rather than fail again in the same obscure way.
+    /// Not [`disconnect`]: there is no card left on which to select the master-file state. Letting
+    /// the session go is what makes the next call say `NotConnected` rather than fail again in the
+    /// same obscure way.
     fn forget_session(&self) {
         drop(self.session.lock().expect("poisoned").take());
         *self.signer.lock().expect("poisoned") = None;
@@ -271,10 +273,11 @@ async fn connect(state: tauri::State<'_, AppState>, reader: Option<String>) -> R
     Ok(status)
 }
 
-/// Power the card down and drop the session.
+/// Reset the JPKI security status and drop the session.
 ///
-/// This is what clears the security status. Not optional, and not something to leave to process
-/// exit — see the module documentation.
+/// Selecting the master-file state leaves JPKI and clears its VERIFY state without interrupting
+/// card power. This is not optional, and not something to leave to process exit — see the module
+/// documentation.
 #[tauri::command]
 async fn disconnect(state: tauri::State<'_, AppState>) -> Result<()> {
     *state.signer.lock().expect("poisoned") = None;
@@ -1379,8 +1382,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("the application failed to start")
         .run(|app, event| {
-            // The last chance to clear the card's security status. Without this, quitting with a
-            // card still in the reader leaves the signature key unlocked.
+            // The last chance to clear the card's security status by selecting the master-file
+            // state. Without this, quitting with a card still in the reader leaves the signature
+            // key unlocked.
             if let tauri::RunEvent::Exit = event
                 && let Some(state) = app.try_state::<AppState>()
                 && let Some(session) = state.session.lock().expect("poisoned").take()
