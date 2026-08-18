@@ -7,19 +7,22 @@
 //! # The security status outlives your program
 //!
 //! `myna-card` says it plainly and it bears repeating, because it decides the shape of this
-//! module: a successful VERIFY stays in effect until the card leaves the field. Dropping the
-//! connection does not clear it. Reconnecting does not clear it. A fresh process is not a fresh
-//! card — only powering the card down is.
+//! module: a successful VERIFY survives dropping and reopening the connection. It is cleared when
+//! the card leaves the field or when a different application is selected. A fresh process is not
+//! by itself a fresh card.
 //!
-//! So [`CardSession`] powers the card down when it is finished with, in [`CardSession::close`] and
-//! again in `Drop` for the paths that do not get there. Without that, closing the application
-//! leaves the signature key unlocked for whatever talks to the card next.
+//! So [`CardSession`] selects the master-file state when it is finished with, in
+//! [`CardSession::close`] and again in `Drop` for the paths that do not get there. On the Individual
+//! Number Card that means selecting the GlobalPlatform Issuer Security Domain; leaving the JPKI
+//! application clears its security status without interrupting power. Without that, closing the
+//! application leaves the signature key unlocked for whatever talks to the card next.
 //!
-//! Powering down closes the window at the end. [`Sharing::Exclusive`] closes it in the middle: a
-//! shared connection leaves the unlocked key reachable by anything else on the machine for as long
-//! as the session lasts, and that is the whole time between the password and the signature. A
-//! session that will present a password takes the card to itself; one that only reads does not,
-//! because reserving a card nobody is signing with locks out software somebody may be relying on.
+//! Selecting the master-file state closes the window at the end. [`Sharing::Exclusive`] closes it
+//! in the middle: a shared connection leaves the unlocked key reachable by anything else on the
+//! machine for as long as the session lasts, and that is the whole time between the password and
+//! the signature. A session that will present a password takes the card to itself; one that only
+//! reads does not, because reserving a card nobody is signing with locks out software somebody may
+//! be relying on.
 //!
 //! # Retry counters
 //!
@@ -35,7 +38,7 @@ use myna_card::ap::jpki::{JpkiAp, SignatureScheme, TokenType};
 use myna_card::transport::pcsc::{self, PcscTransport};
 // The PC/SC crate itself, aliased so `pcsc` keeps meaning myna-card's module everywhere below.
 use ::pcsc as pcsc_crate;
-use myna_card::{Card, Certificate, Pin, Retries};
+use myna_card::{Card, Certificate, MasterFile, Pin, Retries};
 use myna_sign_core::error::{Error, Result};
 use myna_sign_core::signer::DigestSigner;
 use myna_sign_core::x509::CertificateInfo;
@@ -237,35 +240,42 @@ impl CardSession {
         self.sign_ca_certificate.as_ref().map(|c| c.der().to_vec())
     }
 
-    /// Power the card down and disconnect.
+    /// Clear the JPKI security status and disconnect.
     ///
-    /// This is the only thing that clears the security status. Call it; do not rely on the process
-    /// exiting.
+    /// Selects the master-file state, which leaves the JPKI application and clears the VERIFY
+    /// state without interrupting power. Call it; do not rely on merely dropping the connection.
     pub fn close(mut self) -> Result<()> {
-        self.power_down()
+        self.clear_security_status()
     }
 
-    fn power_down(&mut self) -> Result<()> {
+    fn clear_security_status(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
         }
-        self.closed = true;
         self.sign_certificate = None;
         self.sign_ca_certificate = None;
-        self.card.transport_mut().power_cycle()?;
+        select_master_file(&mut self.card)?;
+        self.closed = true;
         Ok(())
     }
+}
+
+fn select_master_file<T: myna_card::transport::Transmit>(
+    card: &mut Card<T>,
+) -> myna_card::Result<()> {
+    MasterFile::select(card)?;
+    Ok(())
 }
 
 impl Drop for CardSession {
     /// A last resort, not the intended path.
     ///
-    /// [`CardSession::close`] reports whether the card actually powered down; this cannot, and a
-    /// failure here leaves the signature key unlocked with nobody told. It is here so that an
+    /// [`CardSession::close`] reports whether the master-file state was selected; this cannot, and
+    /// a failure here leaves the signature key unlocked with nobody told. It is here so that an
     /// early return or a panic does not leave the card open, not so that callers can ignore
     /// `close`.
     fn drop(&mut self) {
-        let _ = self.power_down();
+        let _ = self.clear_security_status();
     }
 }
 
@@ -298,6 +308,19 @@ impl DigestSigner for CardSigner<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use myna_card::transport::Transmit;
+
+    #[derive(Debug, Default)]
+    struct RecordingTransport {
+        sent: Vec<Vec<u8>>,
+    }
+
+    impl Transmit for RecordingTransport {
+        fn transmit(&mut self, command: &[u8]) -> myna_card::Result<Vec<u8>> {
+            self.sent.push(command.to_vec());
+            Ok(vec![0x90, 0x00])
+        }
+    }
 
     /// The card layer cannot be exercised without a card; what can be checked here is that the
     /// types line up, so a change to `DigestSigner` breaks the build rather than the card.
@@ -305,6 +328,19 @@ mod tests {
     fn the_card_signer_is_a_digest_signer() {
         fn assert_impl<T: DigestSigner>() {}
         assert_impl::<CardSigner<'_>>();
+    }
+
+    #[test]
+    fn resetting_the_security_status_selects_the_master_file_state() {
+        let mut card = Card::new(RecordingTransport::default());
+        select_master_file(&mut card).unwrap();
+
+        assert_eq!(
+            card.transport().sent,
+            [vec![
+                0x00, 0xA4, 0x04, 0x0C, 0x07, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00,
+            ]]
+        );
     }
 
     #[test]

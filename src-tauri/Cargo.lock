@@ -2838,9 +2838,9 @@ dependencies = [
 
 [[package]]
 name = "myna-card"
-version = "2.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "761b6a97fd845d9e6187a0a82c0c47b7790df5d3d1f3d48945a3b898eba4c5fb"
+checksum = "fe4aee9656b8bb38e6810fc6e3ae0353e6ef6c3d1914b14e19a3ac7cb68e27a0"
 dependencies = [
  "pcsc",
  "rsa",

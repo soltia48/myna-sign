@@ -454,7 +454,8 @@ where
     }
 
     // Exclusive: this session presents the signature password, and the security status that
-    // creates is reachable by anything else holding the card until it is powered down.
+    // creates is reachable by anything else holding the card until another application is
+    // selected or the card leaves the field.
     let mut session =
         myna_sign_card::CardSession::connect(cli.reader.as_deref(), Sharing::Exclusive)?;
     let status = session.status()?;
@@ -487,11 +488,12 @@ where
         let mut signer = session.signer()?;
         body(&mut signer, ca)
     };
-    // Powering the card down is what clears the security status; a failure here is worth saying
-    // out loud, because the key stays unlocked until the card leaves the field.
+    // Selecting the master-file state leaves JPKI and clears its security status; a failure here
+    // is worth saying out loud, because the key may stay unlocked after this process disconnects.
     if let Err(e) = session.close() {
         eprintln!(
-            "warning: the card did not power down ({e}); the signature key may still be unlocked"
+            "warning: the card's security status could not be reset ({e}); the signature key may \
+             still be unlocked"
         );
     }
     result

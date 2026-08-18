@@ -48,20 +48,21 @@ fn reads_what_the_card_says_without_a_password() {
         "the counter moved just from reading the card, or the card is not fresh"
     );
 
-    session.close().expect("the card did not power down");
+    session
+        .close()
+        .expect("the master-file state was not selected");
 }
 
 /// The check the design calls out as needing hardware on every platform.
 ///
-/// A successful VERIFY survives the process on this card; the only thing that clears it is powering
-/// the card down. If `power_cycle` does not actually do that — and how a `Disposition` is honoured
-/// is up to the driver — then closing the application leaves the signature key unlocked for
-/// whatever talks to the card next, silently.
+/// A successful VERIFY survives dropping and reopening a connection. Selecting a different
+/// application clears the status of the one left, though, and `CardSession::close` uses the MF
+/// selection added in myna-card 3.1 for exactly that.
 ///
-/// So: unlock, confirm the protected file reads, power down, confirm it no longer does.
+/// So: unlock, confirm the protected file reads, select the MF state, confirm it no longer does.
 #[test]
 #[ignore = "needs a card in a reader, and presents the password"]
-fn powering_the_card_down_clears_the_security_status() {
+fn selecting_the_mf_clears_the_security_status() {
     let Some(mut password) = password() else {
         eprintln!("skipping: set MYNA_SIGN_TEST_PASSWORD to run this");
         return;
@@ -79,7 +80,7 @@ fn powering_the_card_down_clears_the_security_status() {
     assert!(
         !sign_certificate_readable(&mut card),
         "the 署名用証明書 read before any password was presented — the card was already unlocked, \
-         so this test cannot tell whether powering down clears anything. Remove the card from the \
+         so this test cannot tell whether selecting the MF clears anything. Remove the card from the \
          reader, put it back, and run again."
     );
     drop(card);
@@ -90,16 +91,18 @@ fn powering_the_card_down_clears_the_security_status() {
             .unlock(&mut password)
             .expect("the password was refused");
         assert!(session.unlocked());
-        // Leaving the scope without `close` would still power down through `Drop`; being explicit
-        // is what the application does, and it is what is under test.
-        session.close().expect("the card did not power down");
+        // Leaving the scope without `close` would still select the MF through `Drop`; being
+        // explicit is what the application does, and it is what is under test.
+        session
+            .close()
+            .expect("the master-file state was not selected");
     }
 
     let mut card = pcsc::connect_any(Sharing::Shared).expect("the card went away");
     assert!(
         !sign_certificate_readable(&mut card),
-        "the 署名用証明書 still reads after power_cycle: the security status survived, and closing \
-         the application would leave the signature key unlocked"
+        "the 署名用証明書 still reads after selecting the MF: the security status survived, and \
+         closing the application would leave the signature key unlocked"
     );
 }
 
@@ -131,7 +134,9 @@ fn one_unlock_signs_more_than_once() {
         assert_eq!(signature.len(), 256);
     }
 
-    session.close().expect("the card did not power down");
+    session
+        .close()
+        .expect("the master-file state was not selected");
 }
 
 /// An exclusive session actually keeps other connections out.
@@ -157,6 +162,8 @@ fn an_exclusive_session_locks_other_connections_out() {
     );
 
     // And the card is usable again once the reservation is given up.
-    session.close().expect("the card did not power down");
+    session
+        .close()
+        .expect("the master-file state was not selected");
     pcsc::connect_any(Sharing::Shared).expect("the card stayed locked after close");
 }

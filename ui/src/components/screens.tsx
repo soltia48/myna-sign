@@ -178,14 +178,12 @@ async function connectCard(reader: string | null) {
 }
 
 /**
- * Drop the session and cut power to the card.
+ * Reset the JPKI security status and drop the session.
  *
- * The message claims only what this side can see: the power-down was sent, no password is held here,
- * and the next signature will ask for one again. What the card did with its own security status is
- * §10.2's unmeasured question, so the message says that is unknown rather than picking the reassuring
- * answer — including in the older phrasing "the key is not unlocked", which asserted the same thing
- * from the other direction. "ロック" is kept for one meaning only: five wrong attempts and a trip to
- * the town hall.
+ * A successful MF selection is the card's acknowledgement that JPKI was left. Per JICSAP 5.1.3,
+ * selecting another application clears the security status of the application left, so the next
+ * signature must present the password again even though card power was not interrupted. "ロック"
+ * is kept for one meaning only: five wrong attempts and a trip to the town hall.
  */
 async function disconnectCard() {
   cardBusy.value = true;
@@ -194,7 +192,7 @@ async function disconnectCard() {
     clearCard();
     notify(
       "info",
-      "カードの電源を落としました。パスワードは本アプリに残っていません。次に署名するときは、もう一度入力が必要です。カード内部の状態までは確認できないため、確実を期すならリーダーから取り外してください。",
+      "カードを切断し、セキュリティ状態をリセットしました。パスワードは本アプリに残っておらず、次に署名するときはもう一度入力が必要です。",
     );
   } catch (e) {
     notify("error", describe(asAppError(e)));
@@ -236,7 +234,7 @@ export function CardScreen() {
           接続
         </button>
         <button class="ghost" onClick={disconnectCard} disabled={busy || !status}>
-          切断（電源を落とす）
+          切断
         </button>
       </div>
 
@@ -889,13 +887,13 @@ export function SignScreen() {
         <div class="status-block">
           <p>
             <strong>
-              このカードは、切断するか、リーダーから取り外すまで、署名鍵のロックが解除されたままです。
+              このカードは、切断して状態をリセットするか、リーダーから取り外すまで、署名鍵のロックが解除されたままです。
             </strong>
             接続中は本アプリがカードを占有するため、ほかのアプリはこのカードを使えません。席を離れるときは、下のボタンで切断するか、カードをリーダーから取り外してください。取り外すと給電が切れ、解錠された状態も失われます。
           </p>
           <div class="row">
             <button class="ghost" onClick={disconnectCard} disabled={cardBusy.value || busy}>
-              切断（電源を落とす）
+              切断
             </button>
           </div>
         </div>
