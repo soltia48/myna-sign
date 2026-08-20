@@ -1615,9 +1615,9 @@ dependencies = [
 
 [[package]]
 name = "myna-card"
-version = "3.1.0"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe4aee9656b8bb38e6810fc6e3ae0353e6ef6c3d1914b14e19a3ac7cb68e27a0"
+checksum = "ae989f306f75bcdfa97be3e84e358db2a271d81107a295882a9490bf5270ef66"
 dependencies = [
  "pcsc",
  "rsa",
@@ -3325,9 +3325,9 @@ dependencies = [
 
 [[package]]
 name = "zerovec"
-version = "0.11.7"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94b5c6b5976d66c1d703c4fd17d3f5e43c8cedaacf604961b171adc7130896d8"
+checksum = "bb0464e17806c1d976d5cba29399c7f08e516e279e2ba493f63123b5fca67dd8"
 dependencies = [
  "yoke",
  "zerofrom",

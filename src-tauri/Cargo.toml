@@ -33,7 +33,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 myna-sign-core = { path = "../crates/myna-sign-core", features = ["tsa-http"] }
 myna-sign-card = { path = "../crates/myna-sign-card" }
-myna-card = { version = "3.1", default-features = false, features = ["pcsc", "verify"] }
+myna-card = { version = "3.3", default-features = false, features = ["pcsc", "verify"] }
 
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
