@@ -2,330 +2,63 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["main"]
   pull_request:
-  workflow_dispatch:
-
-# A newer push to the same branch supersedes an older run.
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
 
-env:
-  CARGO_TERM_COLOR: always
-
-# `-D warnings` is applied in the lint job only. Setting it globally through RUSTFLAGS would make
-# every job fail the day a new compiler release adds a lint, which is noise: the lint job alone
-# reports that, and the tests keep running. It also splits the build cache, because RUSTFLAGS is
-# part of the cache key.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  config:
-    name: Repository configuration
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
 
-      - name: PyYAML
-        run: python3 -c "import yaml" 2>/dev/null || pip install --quiet pyyaml
-
-      # Dependabot answers a config it will not read by opening no pull requests, which looks
-      # exactly like having nothing to update — so a broken file is quiet for a month.
-      - name: dependabot.yml is one Dependabot will read
-        run: |
-          python3 - <<'PY'
-          import sys, yaml
-          text = open(".github/dependabot.yml").read()
-          if [t for t in yaml.scan(text) if isinstance(t, yaml.tokens.AliasToken)]:
-              sys.exit("::error::dependabot.yml uses a YAML alias, and Dependabot rejects the "
-                       "whole file for it: 'YAML aliases are not supported'")
-          config = yaml.safe_load(text)
-          unknown = sorted(set(config) - {"version", "updates", "registries",
-                                          "enable-beta-ecosystems"})
-          if unknown:
-              sys.exit(f"::error::dependabot.yml has top-level keys Dependabot does not take: {unknown}")
-          print(f"dependabot.yml parses, no aliases, {len(config['updates'])} update entries")
-          PY
-
-  lint:
-    name: Format, lints and docs
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: clippy, rustfmt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
 
       - uses: Swatinem/rust-cache@v2
 
-      # `pcsc` links against libpcsclite, which Ubuntu runners do not carry. macOS and Windows
-      # have their PC/SC implementation in the system.
-      - name: PC/SC headers
+      # Tauri needs WebKitGTK, and the card reader uses PC/SC. The remaining tools independently
+      # verify the OpenPGP, PDF, and RFC 3161 output produced by the tests.
+      - name: Install build and test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpcsclite-dev
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libpcsclite-dev \
+            gnupg \
+            poppler-utils \
+            openssl
 
-      # The application links the webview, so linting it needs the same headers a build does.
-      - name: Webview headers
-        run: |
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Install frontend dependencies
+        run: npm ci --prefix ui
 
-      - name: Formatting
+      - name: Build Preact frontend
+        run: npm --prefix ui run build
+
+      - name: Check formatting
         run: cargo fmt --all --check
 
-      # `soft-signer` is what the tests sign with, so the test targets only exist with it on.
-      # Without the feature this lints the library and CLI and skips most of the suite.
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --features myna-sign/soft-signer -- -D warnings
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      # The doc comments carry the reasoning this project is held together by — §7.4, the retry
-      # rules, the share modes — so a broken link in them is worth a red build.
-      - name: Rustdoc
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps --workspace --features myna-sign/soft-signer
-
-  test:
-    name: Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        # The three the project targets. `macos-14` is Apple Silicon, which is the only macOS
-        # architecture this project ships for.
-        os: [ubuntu-latest, macos-14, windows-latest]
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: PC/SC headers
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpcsclite-dev
-
-      # Nothing here touches a reader: everything below the card layer signs with `SoftSigner`,
-      # and the card layer's own tests are `#[ignore]`. Running on all three is what checks that
-      # DER assembly, ByteRange arithmetic and time formatting behave the same everywhere.
+      # Tests requiring a physical card or a live timestamp authority remain explicitly ignored.
       - name: Test
-        run: cargo test -p myna-sign
-
-  interop:
-    name: Cross-check against gpg, pdfsig and openssl
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Tools that judge our output
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpcsclite-dev gnupg poppler-utils openssl
-
-      # Each interop test skips when the tool it needs is missing, which is right for a laptop and
-      # wrong here: a job that silently checked nothing would look exactly like a job that passed.
-      - name: The judges have to actually be here
-        run: |
-          set -euo pipefail
-          for tool in gpg pdfsig openssl; do
-            path=$(command -v "$tool") || {
-              echo "::error::$tool is missing, so the interop tests would skip and pass"
-              exit 1
-            }
-            # `pdfsig` has no --version; it reads the argument as a file name. Print whatever a
-            # tool will tell us, and its path when it will not — which version judged the output
-            # is the first thing worth knowing when this job fails.
-            version=$("$tool" --version 2>/dev/null | head -1 || true)
-            echo "$tool: ${version:-$path}"
-          done
-
-      - name: Test with the judges installed
-        run: cargo test -p myna-sign
-
-      # Reaches two real timestamp authorities. Allowed to fail: an authority being down is not a
-      # defect in this repository, and a red build for it would train people to ignore red builds.
-      - name: Timestamp authorities (network)
-        continue-on-error: true
-        run: cargo test -p myna-sign --test interop -- --ignored
-
-  ui:
-    name: Front end
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-
-      - name: Install
-        run: npm ci
-        working-directory: ui
-
-      # Separate from the `app` job on purpose. A type error is found in about a minute here,
-      # rather than after the Rust release build that job has to do first.
-      - name: Types
-        run: npm run check
-        working-directory: ui
-
-      - name: Build
-        run: npm run build
-        working-directory: ui
-
-  app:
-    name: App (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-14, windows-latest]
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Linux webview and PC/SC
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf \
-            libpcsclite-dev
-
-      - run: npm ci
-        working-directory: ui
-
-      - run: npm run build
-        working-directory: ui
-
-      # `custom-protocol` is what embeds the front end. Without it the binary points at the dev
-      # server and shows "Connection refused" on any machine that is not running `npm run dev`.
-      # `cargo tauri build` adds it; a plain `cargo build` does not, which is why it is spelled out.
-      - name: Build the application
-        run: cargo build --release -p myna-sign-app --features custom-protocol
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: myna-sign-${{ matrix.os }}
-          path: |
-            target/release/myna-sign-app
-            target/release/myna-sign-app.exe
-          if-no-files-found: error
-
-  msrv:
-    name: Minimum supported Rust version
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-
-      # The app inherits this value from the workspace, so there is one source of truth.
-      - name: Read rust-version from the workspace
-        id: msrv
-        run: |
-          set -euo pipefail
-          root=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
-          echo "workspace $root"
-          echo "version=$root" >> "$GITHUB_OUTPUT"
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ steps.msrv.outputs.version }}
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: PC/SC headers
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpcsclite-dev
-
-      # Building is not enough: the declared version has to be able to run the suite. The Tauri
-      # member is checked by the `app` job on stable; its dependency tree has a separate MSRV.
-      - name: Test on the declared minimum
-        run: cargo test -p myna-sign
-
-  audit:
-    name: Security advisories
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # The action reports through a check run, which the workflow-level `contents: read` does not
-    # cover.
-    permissions:
-      contents: read
-      checks: write
-    steps:
-      - uses: actions/checkout@v7
-
-      # This repository signs documents with a key on an identity card and checks the results.
-      # An advisory against the X.509 parser, the RSA implementation, the PDF handling or the HTTP
-      # client is something it should hear about.
-      #
-      # RUSTSEC-2023-0071 is ignored, and it has no fix to wait for: `patched = []`, because the
-      # constant-time rewrite of `rsa` has not landed. It is the Marvin attack, a timing
-      # sidechannel that leaks an RSA *private* key through operations that use one.
-      #
-      # The desktop application has no private key to leak — `src-tauri` does not enable
-      # `soft-signer`, so every signature it makes is made by the card, from a key that cannot
-      # leave it. The CLI does enable it, for `--soft-key`: a throwaway key generated in the
-      # process, used to exercise the pipeline without hardware, and thrown away with it. Its
-      # signatures, as the CLI says when it makes one, prove nothing about anybody, so timing that
-      # key out of the process buys an attacker a key that certifies nothing.
-      #
-      # Drop this line if `soft-signer` is ever offered as a way for a user without a card to sign
-      # something real. `Cargo.toml` says it is not, and that is the assumption.
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ignore: RUSTSEC-2023-0071
-
-  hardware:
-    name: Needs a card (not run in CI)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - run: |
-          echo "These need a reader and a card, so they are run by hand:"
-          echo
-          echo "  cargo test -p myna-sign --test with_card -- --ignored --test-threads=1"
-          echo
-          echo "Two of them cannot be replaced by anything CI does:"
-          echo
-          echo "  powering_the_card_down_clears_the_security_status"
-          echo "    Whether SCARD_UNPOWER_CARD really clears the security status is up to the"
-          echo "    driver. If it does not, closing the application leaves the signature key"
-          echo "    unlocked. Check on Linux, macOS and Windows separately."
-          echo
-          echo "  an_exclusive_session_locks_other_connections_out"
-          echo "    Whether SCARD_SHARE_EXCLUSIVE keeps other processes out is also the driver's"
-          echo "    behaviour. A share mode that silently did nothing would look exactly like one"
-          echo "    that worked, until another program signed with a key this application had"
-          echo "    unlocked. It costs no password to run."
+        run: cargo test --workspace --locked

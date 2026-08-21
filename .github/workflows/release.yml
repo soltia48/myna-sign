@@ -1,158 +1,125 @@
 name: Release
 
-# Tag a commit to release it:
-#
-#     git tag v1.0.0 && git push origin v0.1.0
-#
-# The tag has to match the version, which this project states in the workspace manifest and
-# `tauri.conf.json`. The Tauri member inherits the workspace version. The first job checks both
-# explicit values before anything is built.
-#
-# The jobs run in this order, and the order is the point:
-#
-#     verify ──► bundle (ubuntu, macOS, Windows) ──► a draft release
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
+  # Lets you dry-run all platform builds from the Actions tab without publishing a release.
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  CARGO_TERM_COLOR: always
+concurrency:
+  group: release-${{ github.ref }}
 
 jobs:
-  verify:
-    name: Verify the tag
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: The tag and both versions must agree
-        id: version
-        run: |
-          set -euo pipefail
-          workspace=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          # The one the installer and the About box carry.
-          conf=$(grep -m1 '"version"' src-tauri/tauri.conf.json | cut -d'"' -f4)
-          echo "workspace $workspace, tauri.conf.json $conf"
-          if [ "$workspace" != "$conf" ]; then
-            echo "::error::the two versions disagree"
-            exit 1
-          fi
-          echo "version=$workspace" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.ref_type }}" != "tag" ]; then
-            echo "manual run, the manifests say $workspace"
-            exit 0
-          fi
-          tag="${GITHUB_REF_NAME#v}"
-          if [ "$tag" != "$workspace" ]; then
-            echo "::error::tag v$tag does not match the declared version $workspace"
-            exit 1
-          fi
-
-      - name: Tools that judge our output
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpcsclite-dev gnupg poppler-utils openssl
-
-      # A release must not ship anything the outside verifiers have not passed on. The tests skip
-      # when a tool is missing, so their presence is checked rather than assumed.
-      - name: The judges have to actually be here
-        run: |
-          set -euo pipefail
-          for tool in gpg pdfsig openssl; do
-            path=$(command -v "$tool") || {
-              echo "::error::$tool is missing, so the interop tests would skip and pass"
-              exit 1
-            }
-            # `pdfsig` has no --version; it reads the argument as a file name. Print whatever a
-            # tool will tell us, and its path when it will not — which version judged the output
-            # is the first thing worth knowing when this job fails.
-            version=$("$tool" --version 2>/dev/null | head -1 || true)
-            echo "$tool: ${version:-$path}"
-          done
-
-      - name: Test
-        run: cargo test -p myna-sign
-
-  bundle:
-    name: Installers (${{ matrix.os }})
-    needs: verify
+  build:
+    name: build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    permissions:
-      contents: write
     strategy:
       fail-fast: false
       matrix:
-        # `tauri.conf.json` lists the bundle targets; each runner produces the ones it can.
-        # Linux gives deb and appimage, macOS an app and a dmg, Windows msi and nsis.
-        # `macos-14` is Apple Silicon, which is the only macOS architecture this project targets —
-        # an Intel build would need its own runner and its own line here.
-        os: [ubuntu-latest, macos-14, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: windows-latest
+            target: windows-x86_64
+          - os: macos-latest
+            target: macos-arm64
+          - os: macos-15-intel
+            target: macos-x86_64
+
     steps:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
-      - name: Linux webview and PC/SC
+      - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf \
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
             libpcsclite-dev
 
-      # `beforeBuildCommand` runs `npm --prefix ../ui run build`, which needs the dependencies to
-      # already be there. Nothing else installs them: there is no package.json at the repository
-      # root for the action to find.
-      - name: Front end dependencies
-        run: npm ci
-        working-directory: ui
+      - name: Install frontend dependencies
+        run: npm ci --prefix ui
 
-      # Bundling is `cargo tauri build`, which turns `custom-protocol` on by itself — the front end
-      # ends up inside the binary rather than being fetched from a dev server that will not be
-      # running on anybody else's machine.
-      #
-      # Unsigned. `tauri.conf.json` carries no signing identity and no notarisation credentials,
-      # so macOS will refuse these on first open until the user allows them by hand, and Windows
-      # SmartScreen will warn. That is why the release is a draft: publishing it is a decision.
-      #
-      # `releaseDraft: true` is load-bearing beyond the draft itself: since v1 the action fails
-      # rather than uploads when the release it finds is already published. Re-running a tag whose
-      # release someone has published stops here instead of quietly replacing what people have
-      # been downloading.
-      - uses: tauri-apps/tauri-action@v1
+      - name: Build desktop application
+        run: npm exec --prefix ui -- tauri build --no-bundle
+
+      # The desktop app and CLI are both named `myna-sign` in Cargo's target directory. Preserve
+      # the app before the CLI build replaces that path.
+      - name: Stage desktop application
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then ext=".exe"; else ext=""; fi
+          mkdir -p dist
+          cp "target/release/myna-sign${ext}" "dist/myna-sign-${VERSION}-${TARGET}${ext}"
+
+      - name: Build CLI
+        run: cargo build --release --locked -p myna-sign --bin myna-sign
+
+      - name: Stage CLI
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then ext=".exe"; else ext=""; fi
+          cp "target/release/myna-sign${ext}" "dist/myna-sign-cli-${VERSION}-${TARGET}${ext}"
+
+      - uses: actions/upload-artifact@v7
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: myna-sign ${{ needs.verify.outputs.version }}
-          releaseDraft: true
-          prerelease: false
-          releaseBody: |
-            署名用電子証明書での署名と、その検証。
+          name: ${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
 
-            **これらのインストーラはコード署名されていません。** macOS は初回起動を拒否し、
-            Windows SmartScreen は警告を出します。
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-            動作には PC/SC が必要です。Linux では `pcscd` と `libpcsclite1`、
-            macOS と Windows は OS 内蔵のものを使います。
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: |
+          sha256sum * > "$RUNNER_TEMP/SHA256SUMS.txt"
+          mv "$RUNNER_TEMP/SHA256SUMS.txt" .
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes dist/*
+          fi

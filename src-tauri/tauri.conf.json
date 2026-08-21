@@ -1,22 +1,25 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "myna-sign",
+  "productName": "Myna Sign",
+  "mainBinaryName": "myna-sign",
   "version": "2.0.0",
   "identifier": "ws.nyaa.myna-sign",
   "build": {
-    "beforeDevCommand": "npm --prefix ../ui run dev",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm --prefix ../ui run build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../ui/dist"
   },
   "app": {
     "windows": [
       {
-        "title": "myna-sign",
-        "width": 1080,
+        "label": "main",
+        "title": "Myna Sign",
+        "width": 1120,
         "height": 760,
-        "minWidth": 860,
-        "minHeight": 600
+        "minWidth": 760,
+        "minHeight": 540,
+        "center": true
       }
     ],
     "security": {
@@ -25,22 +28,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "deb",
-      "appimage",
-      "dmg",
-      "app",
-      "msi",
-      "nsis"
-    ],
+    "targets": "all",
     "category": "Utility",
-    "shortDescription": "Sign files and PDFs with a My Number Card",
-    "longDescription": "Attaches a digital signature to any file or PDF using the signing certificate on a Japanese Individual Number Card, and verifies signatures produced that way.",
-    "windows": {
-      "webviewInstallMode": {
-        "type": "downloadBootstrapper"
-      }
-    },
+    "shortDescription": "マイナンバーカードでファイルや PDF に署名",
+    "longDescription": "マイナンバーカードの署名用証明書で任意のファイルや PDF に署名できます。署名を検証することもできます。",
     "linux": {
       "deb": {
         "depends": [
