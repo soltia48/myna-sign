@@ -1,4 +1,13 @@
-/target
-/src-tauri/target
-/ui/dist
-/ui/node_modules
+# Rust build artifacts
+/target/
+
+# Front-end dependencies and output
+/ui/node_modules/
+/ui/dist/
+
+# Coverage / profiling output
+*.profraw
+
+# Editor and OS noise
+.DS_Store
+*.swp

@@ -18,7 +18,7 @@ struct TempDir(PathBuf);
 impl TempDir {
     fn new(name: &str) -> Self {
         let mut path = std::env::temp_dir();
-        path.push(format!("myna-sign-cli-{name}-{}", std::process::id()));
+        path.push(format!("myna-sign-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).unwrap();
         TempDir(path)

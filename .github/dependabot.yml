@@ -8,9 +8,8 @@ updates:
     commit-message:
       prefix: "ci"
 
-  # The library and the CLI. This is where the X.509 parsing, the CMS and PDF assembly and the
-  # RFC 3161 client live, so an update here can change what a signature looks like — grouped
-  # minor and patch updates keep the noise down without hiding a major bump.
+  # The root lockfile covers the library, CLI, and Tauri workspace member. Keeping one Cargo
+  # entry avoids duplicate pull requests for the same dependency update.
   - package-ecosystem: cargo
     directory: /
     schedule:
@@ -21,31 +20,9 @@ updates:
       patch-and-minor:
         update-types: [minor, patch]
 
-    # The RustCrypto generation this project is pinned to, and why it cannot move a crate at a time.
-    #
-    # `cms` 0.2 and `x509-tsp` 0.1 are the newest releases of either, and both are built on `der`
-    # 0.7 and `x509-cert` 0.2. Everything below is in that same world by necessity. Taking any one of
-    # them to the new generation on its own does not produce a version conflict, it produces a type
-    # error: 107 of them for `x509-cert` alone, 174 for `der`.
-    #
-    # The list is the generation, not the pull requests that happened to be open when it was
-    # written. Naming only what Dependabot had proposed is how the first version of this missed
-    # `p256`, `p384` and `rand`, and got them all again a month later. `rand` is here because
-    # `signature` 3 and the 0.14 elliptic curves take `rand_core` 0.10 with them; the curves are
-    # not decoration either, since a real FreeTSA token is ECDSA on P-384.
-    #
-    # Note the update types. These are 0.x crates, so `0.7 -> 0.8` leaves the major at zero and
-    # Dependabot calls it a *minor* update; blocking only `semver-major` would let every one of
-    # them through. `signature` is past 1.0 and is the one that means what it says. Patch updates
-    # are left alone, because for a 0.x crate that is the whole of what stays inside the
-    # generation.
-    #
-    # This list is written out again under /src-tauri, and has to be. Dependabot does not accept
-    # YAML anchors — "YAML aliases are not supported" — so the two copies are the only way to say
-    # it once per directory. `dependabot-ignore-lists-agree` in CI is what stops them drifting.
-    #
-    # Delete both copies when `cms` and `x509-tsp` publish against `der` 0.8, and take the whole
-    # set in one change. Until then a proposal here is a red build, monthly.
+    # cms 0.2 and x509-tsp 0.1 use the der 0.7 / x509-cert 0.2 generation. Updating one crate in
+    # isolation compiles two incompatible ASN.1 type families. Move this set together once both
+    # protocol crates support the newer generation.
     ignore:
       - dependency-name: der
         update-types: [version-update:semver-minor, version-update:semver-major]
@@ -66,50 +43,6 @@ updates:
       - dependency-name: signature
         update-types: [version-update:semver-major]
 
-  # The application is a separate workspace with its own lockfile, so it needs its own entry: an
-  # update to the root does not reach it, and `tauri`, `tauri-build` and `tauri-plugin-dialog` are
-  # declared nowhere else.
-  #
-  # It carries the same ignore list, and not by accident. This workspace reaches `crates/` by path,
-  # and those crates take their versions from the root `[workspace.dependencies]` — so a bump that
-  # would only touch `src-tauri/Cargo.lock` is still proposed as an edit to the root Cargo.toml,
-  # and the same six arrive twice. That is also true of every other crate the root manifest
-  # declares: `rsa` and `lopdf` moving will open two pull requests for one change, and closing the
-  # duplicate is the price of the two workspaces being separate.
-  - package-ecosystem: cargo
-    directory: /src-tauri
-    schedule:
-      interval: monthly
-    commit-message:
-      prefix: "deps"
-    groups:
-      patch-and-minor:
-        update-types: [minor, patch]
-
-    # Kept identical to the list under `/` above, where the reasoning is. Change one, change both.
-    ignore:
-      - dependency-name: der
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: spki
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: x509-cert
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: sha2
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: p521
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: p256
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: p384
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: rand
-        update-types: [version-update:semver-minor, version-update:semver-major]
-      - dependency-name: signature
-        update-types: [version-update:semver-major]
-
-  # The front end. `pdfjs-dist` renders the page a signature is placed on, and a placement drawn
-  # against a viewport that changed is a signature somewhere other than where it was drawn — so
-  # this one is worth reading rather than merging on sight.
   - package-ecosystem: npm
     directory: /ui
     schedule:

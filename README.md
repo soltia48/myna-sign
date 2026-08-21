@@ -49,16 +49,22 @@
 ## 構成
 
 ```
-crates/myna-sign-core/   署名・検証。カードにも GUI にも依存しない
-crates/myna-sign-card/   PC/SC。CardSigner とセッション管理
-crates/myna-sign-cli/    myna-sign コマンド
-src-tauri/               Tauri アプリ (コマンド定義のみ)
+src/                     署名・検証ライブラリ
+src/card.rs              PC/SC、CardSigner、セッション管理
+src/bin/cli.rs           myna-sign CLI
+tests/                   相互運用・CLI・実カードのテスト
+src-tauri/               Tauri アプリ
 ui/                      Preact + Vite
+assets/                  組み込み証明書とフォント
 ```
 
-`myna-sign-core` がカードについて知っているのは `DigestSigner` trait 一つだけで、その中身は
-「32 バイトの SHA-256 を渡すと 256 バイトの署名が返る」に尽きる。OpenPGP・CMS・PDF・RFC 3161 の
-組み立ては、すべてこの trait に対して書かれている。おかげで、カードなしで CI からすべてテストできる。
+ルートの `myna-sign` パッケージがライブラリと CLI を持ち、`src-tauri` は同じ Cargo workspace の
+アプリケーションメンバーになっている。Cargo の依存解決、`Cargo.lock`、`target/` はルートで一元管理する。
+
+署名形式のコードがカードについて知っているのは `DigestSigner` trait 一つだけで、その中身は
+「32 バイトの SHA-256 を渡すと 256 バイトの署名が返る」に尽きる。カード処理を同じパッケージの
+`card` モジュールへまとめてもこの境界は変わらず、OpenPGP・CMS・PDF・RFC 3161 はカードなしで
+テストできる。
 
 ## 必要なもの
 
@@ -74,12 +80,13 @@ ui/                      Preact + Vite
 ## ビルド
 
 ```sh
-# ライブラリと CLI。カードもリーダーも要らない。
-cargo test --workspace --features myna-sign-core/soft-signer
+# ライブラリと CLI。テストにカードもリーダーも要らない。
+cargo test
 
-# GUI。src-tauri は独立したワークスペースになっている。
-cd ui && npm install && npm run build
-cd ../src-tauri && cargo build --release --features custom-protocol
+# GUI
+npm ci --prefix ui
+npm --prefix ui run build
+cargo build --release -p myna-sign-app --features custom-protocol
 ```
 
 `--features custom-protocol` は省略できない。これが無いと Tauri はフロントエンドを
@@ -87,11 +94,10 @@ cd ../src-tauri && cargo build --release --features custom-protocol
 開発サーバを動かしていない環境では「Connection refused」しか出ない。
 `cargo tauri build` を使う場合は自動で付く。
 
-開発中は Vite の開発サーバを併走させる:
+開発中は Tauri CLI から Vite とアプリケーションをまとめて起動する:
 
 ```sh
-cd ui && npm run dev            # 別の端末で
-cd src-tauri && cargo build && ./target/debug/myna-sign-app
+npm exec --prefix ui -- tauri dev
 ```
 
 ## 使ってみる (カードなし)
@@ -100,7 +106,7 @@ cd src-tauri && cargo build && ./target/debug/myna-sign-app
 できあがる署名は誰のことも証明しない。
 
 ```sh
-cargo build -p myna-sign-cli
+cargo build --bin myna-sign
 
 # 任意ファイル → .asc と公開鍵
 ./target/debug/myna-sign --soft-key sign contract.txt --public-key
@@ -160,10 +166,10 @@ J-LIS との契約がなければ到達できない。
 
 ```sh
 # 単体 + gpg / pdfsig との相互検証
-cargo test --workspace --features myna-sign-core/soft-signer
+cargo test
 
 # 実際の TSA に接続するもの (既定では走らない)
-cargo test -p myna-sign-core --features soft-signer -- --ignored
+cargo test --test interop -- --ignored
 ```
 
 | 対象 | 判定者 |
@@ -177,5 +183,5 @@ cargo test -p myna-sign-core --features soft-signer -- --ignored
 
 MIT
 
-同梱している Noto Sans JP (`crates/myna-sign-core/fonts/`) は SIL Open Font License 1.1 で、
+同梱している Noto Sans JP (`assets/fonts/`) は SIL Open Font License 1.1 で、
 ライセンス全文を同じディレクトリに置いてある。配布物にはライセンス全文を必ず含めること。

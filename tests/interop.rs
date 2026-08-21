@@ -14,9 +14,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use myna_sign_core::openpgp::{self, SignOptions};
-use myna_sign_core::signer::SoftSigner;
-use myna_sign_core::time::Timestamp;
+use myna_sign::openpgp::{self, SignOptions};
+use myna_sign::signer::SoftSigner;
+use myna_sign::time::Timestamp;
 
 /// Whether a program is on the PATH.
 fn have(program: &str) -> bool {
@@ -33,7 +33,7 @@ fn have(program: &str) -> bool {
 /// the `gpg` on a Windows runner is the MSYS build that Git for Windows carries, and it decides
 /// whether a path is absolute by POSIX rules. Handed `C:\Users\...` for `--homedir` it sees no
 /// leading `/`, calls it relative, and joins it onto its own working directory — which is how the
-/// keyring ends up at `/d/a/myna-sign/myna-sign/crates/myna-sign-core/C:\Users\...`, no key can be
+/// keyring ends up under the checkout with `C:\Users\...` appended, no key can be
 /// imported, and every verification fails for a reason that has nothing to do with the signature.
 /// A `.` means the same thing to both builds.
 fn gpg_in(dir: &TempDir, args: &[&str]) -> std::process::Output {
@@ -231,7 +231,7 @@ fn the_signature_carries_the_certificate_and_gpg_still_reads_it() {
 }
 
 fn signer_certificate_der(signer: &SoftSigner) -> &[u8] {
-    use myna_sign_core::DigestSigner as _;
+    use myna_sign::DigestSigner as _;
     signer.certificate().der()
 }
 
@@ -244,7 +244,7 @@ fn signer_certificate_der(signer: &SoftSigner) -> &[u8] {
 #[ignore = "reaches the network"]
 #[cfg(feature = "tsa-http")]
 fn both_timestamp_authorities_answer_and_their_tokens_verify() {
-    use myna_sign_core::tsa::{self, BlockingHttp, TsaPreset};
+    use myna_sign::tsa::{self, BlockingHttp, TsaPreset};
 
     let http = BlockingHttp::default();
     let signature_value = b"a signature value to be timestamped";
@@ -303,7 +303,7 @@ fn both_timestamp_authorities_answer_and_their_tokens_verify() {
 #[ignore = "reaches the network"]
 #[cfg(feature = "tsa-http")]
 fn openssl_verifies_a_token_we_fetched() {
-    use myna_sign_core::tsa::{self, BlockingHttp, HttpPost as _, TsaPreset};
+    use myna_sign::tsa::{self, BlockingHttp, HttpPost as _, TsaPreset};
 
     if !have("openssl") {
         eprintln!("skipping: openssl is not installed");
@@ -329,7 +329,7 @@ fn openssl_verifies_a_token_we_fetched() {
     std::fs::write(dir.join("reply.tsr"), &response).unwrap();
     std::fs::write(
         dir.join("root.pem"),
-        pem(myna_sign_core::tsa::roots::FREETSA_ROOT),
+        pem(myna_sign::tsa::roots::FREETSA_ROOT),
     )
     .unwrap();
 
@@ -418,11 +418,11 @@ fn pdfsig_accepts_a_signature_we_made() {
     let path = dir.join("signed.pdf");
 
     let mut signer = soft_signer();
-    let options = myna_sign_core::pdf::PdfSignOptions {
+    let options = myna_sign::pdf::PdfSignOptions {
         reason: Some("Interop".into()),
         ..Default::default()
     };
-    let signed = myna_sign_core::pdf::sign(&mut signer, &blank_pdf(), &options).unwrap();
+    let signed = myna_sign::pdf::sign(&mut signer, &blank_pdf(), &options).unwrap();
     std::fs::write(&path, &signed.bytes).unwrap();
 
     let report = pdfsig(&path);
@@ -449,16 +449,16 @@ fn pdfsig_rejects_a_document_changed_after_signing() {
     let path = dir.join("tampered.pdf");
 
     let mut signer = soft_signer();
-    let mut bytes = myna_sign_core::pdf::sign(
+    let mut bytes = myna_sign::pdf::sign(
         &mut signer,
         &blank_pdf(),
-        &myna_sign_core::pdf::PdfSignOptions::default(),
+        &myna_sign::pdf::PdfSignOptions::default(),
     )
     .unwrap()
     .bytes;
 
     // Flip a byte inside the signed range.
-    let range = myna_sign_core::pdf::verify::byte_range_of(&bytes).unwrap();
+    let range = myna_sign::pdf::verify::byte_range_of(&bytes).unwrap();
     bytes[range[1] / 2] ^= 0x01;
     std::fs::write(&path, &bytes).unwrap();
 
@@ -490,17 +490,15 @@ fn pdfsig_accepts_a_visible_signature_with_an_image() {
     let path = dir.join("stamped.pdf");
 
     let mut signer = soft_signer();
-    let options = myna_sign_core::pdf::PdfSignOptions {
-        appearance: Some(myna_sign_core::pdf::Appearance {
+    let options = myna_sign::pdf::PdfSignOptions {
+        appearance: Some(myna_sign::pdf::Appearance {
             page: 1,
             rect: [400.0, 60.0, 545.0, 130.0],
-            image: Some(myna_sign_core::pdf::SignatureImage::from_bytes(
-                png.into_inner(),
-            )),
+            image: Some(myna_sign::pdf::SignatureImage::from_bytes(png.into_inner())),
         }),
         ..Default::default()
     };
-    let signed = myna_sign_core::pdf::sign(&mut signer, &blank_pdf(), &options).unwrap();
+    let signed = myna_sign::pdf::sign(&mut signer, &blank_pdf(), &options).unwrap();
     std::fs::write(&path, &signed.bytes).unwrap();
 
     let report = pdfsig(&path);
@@ -515,16 +513,16 @@ fn pdfsig_accepts_a_visible_signature_with_an_image() {
 #[ignore = "reaches the network"]
 #[cfg(feature = "tsa-http")]
 fn pdfsig_reads_a_timestamp_we_attached() {
-    use myna_sign_core::tsa::{self, BlockingHttp, TsaPreset};
+    use myna_sign::tsa::{self, BlockingHttp, TsaPreset};
 
     let dir = TempDir::new("pdfsig-tsa");
     let path = dir.join("timestamped.pdf");
 
     let mut signer = soft_signer();
-    let mut signed = myna_sign_core::pdf::sign(
+    let mut signed = myna_sign::pdf::sign(
         &mut signer,
         &blank_pdf(),
-        &myna_sign_core::pdf::PdfSignOptions::default(),
+        &myna_sign::pdf::PdfSignOptions::default(),
     )
     .unwrap();
 
@@ -534,7 +532,7 @@ fn pdfsig_reads_a_timestamp_we_attached() {
     std::fs::write(&path, &signed.bytes).unwrap();
 
     // Our own verifier: the signature still holds and the timestamp checks out.
-    let results = myna_sign_core::pdf::verify(&signed.bytes, &Default::default()).unwrap();
+    let results = myna_sign::pdf::verify(&signed.bytes, &Default::default()).unwrap();
     assert!(results[0].signature_verified, "{:#?}", results[0]);
     assert!(results[0].document_digest_matches);
     let stamp = results[0]
@@ -649,7 +647,7 @@ fn splitting_a_cleartext_message_recovers_what_was_signed() {
 #[ignore = "reaches the network"]
 #[cfg(feature = "tsa-http")]
 fn an_openpgp_timestamp_survives_a_round_trip() {
-    use myna_sign_core::tsa::{self, BlockingHttp, TsaPreset};
+    use myna_sign::tsa::{self, BlockingHttp, TsaPreset};
 
     let http = BlockingHttp::default();
     let document = b"the document that was signed";
@@ -712,9 +710,9 @@ fn an_openpgp_timestamp_survives_a_round_trip() {
 /// hand the result to something that is not this program.
 #[test]
 fn pdfsig_accepts_a_signature_with_a_generated_panel() {
-    use myna_sign_core::DigestSigner as _;
-    use myna_sign_core::pdf;
-    use myna_sign_core::x509::CertificateInfo;
+    use myna_sign::DigestSigner as _;
+    use myna_sign::pdf;
+    use myna_sign::x509::CertificateInfo;
 
     if !have("pdfsig") {
         eprintln!("skipping: pdfsig (poppler-utils) is not installed");
@@ -770,7 +768,7 @@ fn pdfsig_accepts_a_signature_with_a_generated_panel() {
 /// An image is fitted into the field, not stretched to it.
 #[test]
 fn a_stamp_keeps_its_proportions_in_a_field_of_a_different_shape() {
-    use myna_sign_core::pdf;
+    use myna_sign::pdf;
 
     // A wide panel dropped into a tall, narrow rectangle.
     let panel = pdf::SignatureBlock {
@@ -832,10 +830,10 @@ fn pdfsig_accepts_a_signature_added_to_an_existing_form() {
     let path = dir.join("form.pdf");
 
     let mut signer = soft_signer();
-    let signed = myna_sign_core::pdf::sign(
+    let signed = myna_sign::pdf::sign(
         &mut signer,
         &form_pdf(),
-        &myna_sign_core::pdf::PdfSignOptions::default(),
+        &myna_sign::pdf::PdfSignOptions::default(),
     )
     .unwrap();
     std::fs::write(&path, &signed.bytes).unwrap();

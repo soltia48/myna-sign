@@ -5,7 +5,7 @@
 //! blocked and only a municipal office can unblock it.
 //!
 //! ```sh
-//! MYNA_SIGN_TEST_PASSWORD=... cargo test -p myna-sign-card -- --ignored --test-threads=1
+//! MYNA_SIGN_TEST_PASSWORD=... cargo test --test with_card -- --ignored --test-threads=1
 //! ```
 //!
 //! The password is read from the environment rather than taken as an argument so that it does not
@@ -15,7 +15,7 @@ use myna_card::ap::jpki::JpkiAp;
 use myna_card::{Card, transport::pcsc};
 // `pcsc` above is myna-card's module; the leading `::` is what reaches the crate of that name.
 use ::pcsc as pcsc_crate;
-use myna_sign_card::{CardSession, Sharing};
+use myna_sign::card::{CardSession, Sharing};
 
 /// The password, or `None` to skip.
 fn password() -> Option<String> {
@@ -112,7 +112,7 @@ fn selecting_the_mf_clears_the_security_status() {
 #[test]
 #[ignore = "needs a card in a reader, and presents the password"]
 fn one_unlock_signs_more_than_once() {
-    use myna_sign_core::signer::{DigestSigner as _, sha256};
+    use myna_sign::signer::{DigestSigner as _, sha256};
 
     let Some(mut password) = password() else {
         eprintln!("skipping: set MYNA_SIGN_TEST_PASSWORD to run this");

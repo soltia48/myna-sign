@@ -1,7 +1,7 @@
 {
   "name": "myna-sign-ui",
   "private": true,
-  "version": "1.1.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,15 +10,16 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@preact/signals": "^2.0.4",
-    "@tauri-apps/api": "^2.4.0",
-    "@tauri-apps/plugin-dialog": "^2.2.1",
+    "@preact/signals": "^2.11.1",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
     "pdfjs-dist": "^6.2.108",
-    "preact": "^10.26.5"
+    "preact": "^10.29.8"
   },
   "devDependencies": {
-    "@preact/preset-vite": "^2.10.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@tauri-apps/cli": "^2.11.4",
     "typescript": "^7.0.2",
-    "vite": "^8.2.1"
+    "vite": "^8.2.2"
   }
 }

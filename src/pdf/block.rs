@@ -47,9 +47,10 @@ use super::appearance::SignatureImage;
 
 /// Noto Sans JP, subsetted to Japanese, under the SIL Open Font License 1.1.
 ///
-/// The licence travels with it in `fonts/LICENSE-NotoSansJP.txt` and must be reproduced in any
+/// The licence travels with it in `assets/fonts/LICENSE-NotoSansJP.txt` and must be reproduced in
+/// any
 /// distribution of this program.
-const FONT: &[u8] = include_bytes!("../../fonts/NotoSansJP-Regular.otf");
+const FONT: &[u8] = include_bytes!("../../assets/fonts/NotoSansJP-Regular.otf");
 
 /// Rendered at four times the size it is placed at, so the panel stays sharp when the page is
 /// zoomed in a viewer or printed. Four rather than three because the type below is small in

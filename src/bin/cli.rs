@@ -1,4 +1,4 @@
-//! A command line front end for `myna-sign-core`.
+//! A command line front end for `myna-sign`.
 //!
 //! Not the product — the GUI is — but the way to exercise the whole pipeline against a real card
 //! without a window, and the way CI produces files for `gpg`, `pdfsig` and `openssl ts` to judge.
@@ -12,13 +12,13 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use myna_sign_card::Sharing;
-use myna_sign_core::error::{Error, Result};
-use myna_sign_core::openpgp::{self, SignOptions};
-use myna_sign_core::pdf;
-use myna_sign_core::signer::DigestSigner;
-use myna_sign_core::time::Timestamp;
-use myna_sign_core::tsa::{self, BlockingHttp, TsaConfig, TsaPreset};
+use myna_sign::card::Sharing;
+use myna_sign::error::{Error, Result};
+use myna_sign::openpgp::{self, SignOptions};
+use myna_sign::pdf;
+use myna_sign::signer::DigestSigner;
+use myna_sign::time::Timestamp;
+use myna_sign::tsa::{self, BlockingHttp, TsaConfig, TsaPreset};
 
 #[derive(Parser)]
 #[command(
@@ -175,7 +175,7 @@ fn main() -> ExitCode {
 fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Readers => {
-            for reader in myna_sign_card::list_readers()? {
+            for reader in myna_sign::card::list_readers()? {
                 println!("{reader}");
             }
             Ok(())
@@ -184,7 +184,7 @@ fn run(cli: &Cli) -> Result<()> {
             // Reads only, so it shares: a command for looking at the card should not be able to
             // evict whatever else is using it.
             let mut session =
-                myna_sign_card::CardSession::connect(cli.reader.as_deref(), Sharing::Shared)?;
+                myna_sign::card::CardSession::connect(cli.reader.as_deref(), Sharing::Shared)?;
             let status = session.status()?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             if status.has_auth_certificate {
@@ -244,7 +244,7 @@ fn run(cli: &Cli) -> Result<()> {
                 }
             }
             if *public_key {
-                let name = myna_sign_core::x509::CertificateInfo::read(signer.certificate())?
+                let name = myna_sign::x509::CertificateInfo::read(signer.certificate())?
                     .common_name
                     .unwrap_or_else(|| "My Number Card".into());
                 let armored = openpgp::export_certificate(signer, &name)?;
@@ -276,8 +276,7 @@ fn run(cli: &Cli) -> Result<()> {
                         .map_err(|e| Error::io(format!("reading {}", path.display()), e))?,
                 ))
             } else {
-                let certificate =
-                    myna_sign_core::x509::CertificateInfo::read(signer.certificate())?;
+                let certificate = myna_sign::x509::CertificateInfo::read(signer.certificate())?;
                 Some(pdf::SignatureBlock::describe(&certificate, Timestamp::now()?).render()?)
             };
 
@@ -445,7 +444,7 @@ where
             "warning: --soft-key signs with a throwaway software key. \
              The result proves nothing about anybody."
         );
-        let mut signer = myna_sign_core::signer::SoftSigner::generate(
+        let mut signer = myna_sign::signer::SoftSigner::generate(
             "CN=myna-sign soft key,C=JP",
             Timestamp::now()?,
             365,
@@ -457,7 +456,7 @@ where
     // creates is reachable by anything else holding the card until another application is
     // selected or the card leaves the field.
     let mut session =
-        myna_sign_card::CardSession::connect(cli.reader.as_deref(), Sharing::Exclusive)?;
+        myna_sign::card::CardSession::connect(cli.reader.as_deref(), Sharing::Exclusive)?;
     let status = session.status()?;
     if !status.has_sign_certificate {
         return Err(Error::NotChecked(

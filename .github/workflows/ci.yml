@@ -34,8 +34,7 @@ jobs:
         run: python3 -c "import yaml" 2>/dev/null || pip install --quiet pyyaml
 
       # Dependabot answers a config it will not read by opening no pull requests, which looks
-      # exactly like having nothing to update — so a broken file is quiet for a month. These two
-      # checks are the mistakes already made here: an alias, and a top-level key of our own.
+      # exactly like having nothing to update — so a broken file is quiet for a month.
       - name: dependabot.yml is one Dependabot will read
         run: |
           python3 - <<'PY'
@@ -52,24 +51,6 @@ jobs:
           print(f"dependabot.yml parses, no aliases, {len(config['updates'])} update entries")
           PY
 
-      # The two cargo entries ignore the same six crates, because a bump that only reaches
-      # `src-tauri/Cargo.lock` is still proposed against the root manifest. With aliases out, the
-      # list is written twice, and two copies of anything drift unless something notices.
-      - name: The two cargo ignore lists agree
-        run: |
-          python3 - <<'PY'
-          import sys, yaml
-          config = yaml.safe_load(open(".github/dependabot.yml"))
-          lists = {u["directory"]: u.get("ignore", [])
-                   for u in config["updates"] if u["package-ecosystem"] == "cargo"}
-          if sorted(lists) != ["/", "/src-tauri"]:
-              sys.exit(f"::error::expected cargo entries for / and /src-tauri, found {sorted(lists)}")
-          if lists["/"] != lists["/src-tauri"]:
-              sys.exit("::error::the two cargo ignore lists have drifted; they cover the same "
-                       "crates and Dependabot has no way to share one between directories")
-          print(f"the two cargo ignore lists agree ({len(lists['/'])} entries)")
-          PY
-
   lint:
     name: Format, lints and docs
     runs-on: ubuntu-latest
@@ -82,12 +63,6 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          # Two workspaces: `src-tauri` is deliberately outside the main one so the library and
-          # CLI can be built without the webview toolchain.
-          workspaces: |
-            .
-            src-tauri
 
       # `pcsc` links against libpcsclite, which Ubuntu runners do not carry. macOS and Windows
       # have their PC/SC implementation in the system.
@@ -106,31 +81,17 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
 
-      - name: Formatting (app)
-        run: cargo fmt --all --check
-        working-directory: src-tauri
-
       # `soft-signer` is what the tests sign with, so the test targets only exist with it on.
       # Without the feature this lints the library and CLI and skips most of the suite.
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --features myna-sign-core/soft-signer -- -D warnings
-
-      - name: Clippy (app)
-        run: cargo clippy --all-targets -- -D warnings
-        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets --features myna-sign/soft-signer -- -D warnings
 
       # The doc comments carry the reasoning this project is held together by — §7.4, the retry
       # rules, the share modes — so a broken link in them is worth a red build.
       - name: Rustdoc
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps --workspace --features myna-sign-core/soft-signer
-
-      - name: Rustdoc (app)
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps
-        working-directory: src-tauri
+        run: cargo doc --no-deps --workspace --features myna-sign/soft-signer
 
   test:
     name: Test (${{ matrix.os }})
@@ -159,7 +120,7 @@ jobs:
       # and the card layer's own tests are `#[ignore]`. Running on all three is what checks that
       # DER assembly, ByteRange arithmetic and time formatting behave the same everywhere.
       - name: Test
-        run: cargo test --workspace --features myna-sign-core/soft-signer
+        run: cargo test -p myna-sign
 
   interop:
     name: Cross-check against gpg, pdfsig and openssl
@@ -195,13 +156,13 @@ jobs:
           done
 
       - name: Test with the judges installed
-        run: cargo test --workspace --features myna-sign-core/soft-signer
+        run: cargo test -p myna-sign
 
       # Reaches two real timestamp authorities. Allowed to fail: an authority being down is not a
       # defect in this repository, and a red build for it would train people to ignore red builds.
       - name: Timestamp authorities (network)
         continue-on-error: true
-        run: cargo test -p myna-sign-core --features soft-signer -- --ignored
+        run: cargo test -p myna-sign --test interop -- --ignored
 
   ui:
     name: Front end
@@ -250,8 +211,6 @@ jobs:
           cache-dependency-path: ui/package-lock.json
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Linux webview and PC/SC
         if: runner.os == 'Linux'
@@ -272,15 +231,14 @@ jobs:
       # server and shows "Connection refused" on any machine that is not running `npm run dev`.
       # `cargo tauri build` adds it; a plain `cargo build` does not, which is why it is spelled out.
       - name: Build the application
-        run: cargo build --release --features custom-protocol
-        working-directory: src-tauri
+        run: cargo build --release -p myna-sign-app --features custom-protocol
 
       - uses: actions/upload-artifact@v7
         with:
           name: myna-sign-${{ matrix.os }}
           path: |
-            src-tauri/target/release/myna-sign-app
-            src-tauri/target/release/myna-sign-app.exe
+            target/release/myna-sign-app
+            target/release/myna-sign-app.exe
           if-no-files-found: error
 
   msrv:
@@ -290,19 +248,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Both manifests declare one, and they are supposed to be the same number. A release that
-      # builds on the older of the two and not the newer would be a claim nobody had checked.
-      - name: Read rust-version from both manifests
+      # The app inherits this value from the workspace, so there is one source of truth.
+      - name: Read rust-version from the workspace
         id: msrv
         run: |
           set -euo pipefail
           root=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
-          app=$(grep -m1 '^rust-version' src-tauri/Cargo.toml | cut -d'"' -f2)
-          echo "workspace $root, app $app"
-          if [ "$root" != "$app" ]; then
-            echo "::error::Cargo.toml says $root and src-tauri/Cargo.toml says $app"
-            exit 1
-          fi
+          echo "workspace $root"
           echo "version=$root" >> "$GITHUB_OUTPUT"
 
       - uses: dtolnay/rust-toolchain@master
@@ -316,11 +268,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpcsclite-dev
 
-      # Building is not enough: the declared version has to be able to run the suite, or the claim
-      # in Cargo.toml is not worth much. The application is left out — it is checked by the `app`
-      # job on stable, and its dependency tree is Tauri's rather than this project's.
+      # Building is not enough: the declared version has to be able to run the suite. The Tauri
+      # member is checked by the `app` job on stable; its dependency tree has a separate MSRV.
       - name: Test on the declared minimum
-        run: cargo test --workspace --features myna-sign-core/soft-signer
+        run: cargo test -p myna-sign
 
   audit:
     name: Security advisories
@@ -350,7 +301,7 @@ jobs:
       # key out of the process buys an attacker a key that certifies nothing.
       #
       # Drop this line if `soft-signer` is ever offered as a way for a user without a card to sign
-      # something real. `myna-sign-core/Cargo.toml` says it is not, and that is the assumption.
+      # something real. `Cargo.toml` says it is not, and that is the assumption.
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -364,7 +315,7 @@ jobs:
       - run: |
           echo "These need a reader and a card, so they are run by hand:"
           echo
-          echo "  cargo test -p myna-sign-card -- --ignored --test-threads=1"
+          echo "  cargo test -p myna-sign --test with_card -- --ignored --test-threads=1"
           echo
           echo "Two of them cannot be replaced by anything CI does:"
           echo

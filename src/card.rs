@@ -1,8 +1,8 @@
 //! The card side of myna-sign.
 //!
-//! Everything that touches a reader lives here, and nothing else does. `myna-sign-core` knows only
-//! [`myna_sign_core::DigestSigner`]; this crate is the one implementation of it that involves
-//! hardware, plus the session handling that goes with a card whose state outlives the process.
+//! Everything that touches a reader lives here, and nothing else does. The signing-format modules
+//! know only [`crate::DigestSigner`]; [`CardSigner`] is the implementation that involves hardware,
+//! alongside the session handling for a card whose state outlives the process.
 //!
 //! # The security status outlives your program
 //!
@@ -37,11 +37,11 @@
 use myna_card::ap::jpki::{JpkiAp, SignatureScheme, TokenType};
 use myna_card::transport::pcsc::{self, PcscTransport};
 // The PC/SC crate itself, aliased so `pcsc` keeps meaning myna-card's module everywhere below.
+use crate::error::{Error, Result};
+use crate::signer::DigestSigner;
+use crate::x509::CertificateInfo;
 use ::pcsc as pcsc_crate;
 use myna_card::{Card, Certificate, MasterFile, Pin, Retries};
-use myna_sign_core::error::{Error, Result};
-use myna_sign_core::signer::DigestSigner;
-use myna_sign_core::x509::CertificateInfo;
 use serde::Serialize;
 use zeroize::Zeroize;
 
@@ -279,7 +279,7 @@ impl Drop for CardSession {
     }
 }
 
-/// The 署名用秘密鍵, as something `myna-sign-core` can sign with.
+/// The 署名用秘密鍵, as something `myna-sign` can sign with.
 #[derive(Debug)]
 pub struct CardSigner<'a> {
     session: &'a mut CardSession,

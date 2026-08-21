@@ -6,7 +6,8 @@
 //! - **DigiCert**'s responder chains to `DigiCert Trusted Root G4`, which is in the Mozilla root
 //!   list, so [`TrustAnchors::mozilla`] covers it.
 //! - **FreeTSA**'s responder chains to `O=Free TSA, OU=Root CA`, which is self-signed and in no
-//!   browser or operating system store at all. It is compiled in from `certs/`, the same way
+//!   browser or operating system store at all. It is compiled in from `assets/certs/`, the same
+//!   way
 //!   `myna-card` carries the J-LIS roots — a root read from disk at run time is a root an attacker
 //!   can replace.
 //!
@@ -23,7 +24,7 @@ use crate::time::Timestamp;
 /// FreeTSA's root, as published at <https://freetsa.org/files/cacert.pem>.
 ///
 /// Compiled in rather than read at run time so that nothing can substitute one.
-pub const FREETSA_ROOT: &[u8] = include_bytes!("../../certs/freetsa-root.cer");
+pub const FREETSA_ROOT: &[u8] = include_bytes!("../../assets/certs/freetsa-root.cer");
 
 /// How deep a chain may go before it is treated as a loop.
 const MAX_DEPTH: usize = 8;

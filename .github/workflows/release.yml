@@ -4,10 +4,9 @@ name: Release
 #
 #     git tag v1.0.0 && git push origin v0.1.0
 #
-# The tag has to match the version, which this project states in three places — the workspace
-# manifest, the application manifest, and `tauri.conf.json`, whose copy is the one that ends up in
-# the installer and in the window's About box. The first job checks all three before anything is
-# built.
+# The tag has to match the version, which this project states in the workspace manifest and
+# `tauri.conf.json`. The Tauri member inherits the workspace version. The first job checks both
+# explicit values before anything is built.
 #
 # The jobs run in this order, and the order is the point:
 #
@@ -37,17 +36,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: The tag and all three versions must agree
+      - name: The tag and both versions must agree
         id: version
         run: |
           set -euo pipefail
           workspace=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          app=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d'"' -f2)
           # The one the installer and the About box carry.
           conf=$(grep -m1 '"version"' src-tauri/tauri.conf.json | cut -d'"' -f4)
-          echo "workspace $workspace, app $app, tauri.conf.json $conf"
-          if [ "$workspace" != "$app" ] || [ "$workspace" != "$conf" ]; then
-            echo "::error::the three versions disagree"
+          echo "workspace $workspace, tauri.conf.json $conf"
+          if [ "$workspace" != "$conf" ]; then
+            echo "::error::the two versions disagree"
             exit 1
           fi
           echo "version=$workspace" >> "$GITHUB_OUTPUT"
@@ -84,7 +82,7 @@ jobs:
           done
 
       - name: Test
-        run: cargo test --workspace --features myna-sign-core/soft-signer
+        run: cargo test -p myna-sign
 
   bundle:
     name: Installers (${{ matrix.os }})
@@ -113,8 +111,6 @@ jobs:
           cache-dependency-path: ui/package-lock.json
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Linux webview and PC/SC
         if: runner.os == 'Linux'

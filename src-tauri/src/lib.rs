@@ -1,7 +1,7 @@
 //! The myna-sign application: the commands the interface can call, and nothing else.
 //!
-//! There is no signing logic here. Every command is a thin wrapper over `myna-sign-core` and
-//! `myna-sign-card`, which is what keeps the parts that matter testable without a window.
+//! There is no signing logic here. Every command is a thin wrapper over the `myna-sign` library,
+//! which keeps the parts that matter testable without a window.
 //!
 //! # Two rules this layer exists to enforce
 //!
@@ -22,14 +22,14 @@
 
 use std::sync::{Arc, Mutex};
 
-use myna_sign_card::{CardSession, CardStatus, Sharing};
-use myna_sign_core::error::Error;
-use myna_sign_core::openpgp::{self, SignOptions};
-use myna_sign_core::pdf;
-use myna_sign_core::signer::DigestSigner;
-use myna_sign_core::time::Timestamp;
-use myna_sign_core::tsa::{self, BlockingHttp, TimestampVerification, TsaConfig};
-use myna_sign_core::x509::CertificateInfo;
+use myna_sign::card::{CardSession, CardStatus, Sharing};
+use myna_sign::error::Error;
+use myna_sign::openpgp::{self, SignOptions};
+use myna_sign::pdf;
+use myna_sign::signer::DigestSigner;
+use myna_sign::time::Timestamp;
+use myna_sign::tsa::{self, BlockingHttp, TimestampVerification, TsaConfig};
+use myna_sign::x509::CertificateInfo;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
@@ -104,9 +104,9 @@ impl From<Error> for AppError {
     /// Matching on prose would make the wording load-bearing, and it is not: every one of these
     /// strings exists to be read by a person and reworded when it reads badly.
     fn from(error: Error) -> Self {
-        // The guard asks `myna-sign-card`, which owns the PC/SC crate, rather than reading the
+        // The guard asks `myna-sign`, which owns the PC/SC crate, rather than reading the
         // message: the kind still comes from a variant, just one this crate cannot name.
-        if myna_sign_card::is_card_busy(&error) {
+        if myna_sign::card::is_card_busy(&error) {
             return AppError::CardBusy;
         }
         match &error {
@@ -257,7 +257,7 @@ fn still_answering(session: &mut CardSession) -> bool {
 /// The PC/SC readers currently available.
 #[tauri::command]
 async fn list_readers() -> Result<Vec<String>> {
-    Ok(myna_sign_card::list_readers()?)
+    Ok(myna_sign::card::list_readers()?)
 }
 
 /// Connect to a card and read what it says without a password.
@@ -907,7 +907,7 @@ async fn sign_files(
                     unwritten: Unwritten::Pgp(Box::new(signature)),
                     source: path.clone(),
                     output: beside(path, "asc"),
-                    document_digest: hex::encode(myna_sign_core::signer::sha256(bytes)),
+                    document_digest: hex::encode(myna_sign::signer::sha256(bytes)),
                     tsa: request.tsa.clone(),
                     write_tsr: request.write_tsr,
                     timestamp: None,
@@ -1120,7 +1120,7 @@ async fn sign_pdf(
             unwritten: Unwritten::Pdf(Box::new(signed)),
             source: request.path.clone(),
             output: request.output.clone(),
-            document_digest: hex::encode(myna_sign_core::signer::sha256(&original)),
+            document_digest: hex::encode(myna_sign::signer::sha256(&original)),
             tsa: request.tsa.clone(),
             write_tsr: false,
             timestamp: None,
@@ -1349,7 +1349,7 @@ async fn read_file(path: String) -> Result<tauri::ipc::Response> {
 #[tauri::command]
 async fn document_digest(path: String) -> Result<String> {
     let bytes = std::fs::read(&path).map_err(|e| read_error(&path, e))?;
-    Ok(hex::encode(myna_sign_core::signer::sha256(&bytes)))
+    Ok(hex::encode(myna_sign::signer::sha256(&bytes)))
 }
 
 /// Start the application.

@@ -657,7 +657,7 @@ fn write_contents(
     if der.len() * 2 > room {
         return Err(Error::malformed(format!(
             "the signature needs {} bytes but {} were reserved; \
-             raise myna_sign_core::pdf::sign::RESERVED_BYTES",
+             raise myna_sign::pdf::sign::RESERVED_BYTES",
             der.len(),
             room / 2
         )));
