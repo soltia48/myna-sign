@@ -105,7 +105,8 @@ impl SoftSigner {
     /// validity runs from `not_before` for `days`; both are given rather than taken from the clock
     /// so that a fixture is the same every time it is built.
     pub fn generate(subject: &str, not_before: crate::time::Timestamp, days: u32) -> Result<Self> {
-        use rand::rngs::OsRng;
+        // rsa 0.9 uses rand_core 0.6, while rand 0.10 uses rand_core 0.10.
+        use rsa::rand_core::OsRng;
 
         let key = rsa::RsaPrivateKey::new(&mut OsRng, 2048)
             .map_err(|e| Error::malformed(format!("generating an RSA key failed: {e}")))?;

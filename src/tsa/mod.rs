@@ -153,8 +153,10 @@ pub fn build_request(signature_value: &[u8]) -> Result<Request> {
     let imprint = sha256(signature_value);
 
     let mut nonce = [0u8; 8];
-    use rand::RngCore as _;
-    rand::rngs::OsRng.fill_bytes(&mut nonce);
+    use rand::TryRng as _;
+    rand::rngs::SysRng
+        .try_fill_bytes(&mut nonce)
+        .map_err(|e| Error::io("generating timestamp nonce", e.into()))?;
     // `Int` is signed; keep the value positive so the encoding does not grow a leading zero and
     // so an authority that echoes the integer rather than the bytes still compares equal.
     nonce[0] &= 0x7F;
