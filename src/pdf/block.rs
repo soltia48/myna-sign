@@ -4,19 +4,17 @@
 //! draws a 署名欄 instead: 住所 above 氏名, which is the order a Japanese document is signed in and
 //! read in, with the time underneath.
 //!
-//! # Why not the label-and-value panel other products draw
+//! A quiet heading identifies the block; the holder's name is the largest line. Address, name and
+//! signing time share an alignment edge, with a rule under the name rather than around the block.
+//! A minimum width leaves room to read the date even when the name is short. `/Reason` and
+//! `/Location` stay in the signature dictionary rather than adding rows to the drawing.
 //!
-//! Because of the shape it made. The old one grew a row at a time and a column as wide as its
-//! longest value, so it arrived at roughly square for the common case and at 346pt — half the width
-//! of the page — for one long 理由. A signature block is a shape people recognise, and that was not
-//! it. `/Reason` and `/Location` are in the signature dictionary either way, and the interface
-//! shows them when it verifies one.
-//!
-//! # These sizes are the sizes on paper
+//! # Natural sizes are in PDF points
 //!
 //! [`super::default_placement`] takes the size out of [`SignatureImage::natural_size`], which this
-//! sets from the layout below. Nothing scales it down on the way to the page, so a point here is a
-//! point there, and choosing 9pt for the address means the address is 9pt on the paper.
+//! sets from the layout below. At that natural size, choosing 9pt for the address means 9pt on
+//! paper. An explicit placement rectangle, including one retained from the GUI preview, scales
+//! the drawing proportionally to fit; its printed type size then follows that rectangle.
 //!
 //! It also stops the drawing looking like a verdict. A bordered box of checked-looking fields is
 //! what a viewer draws when it has *validated* a signature, and this program has not validated
@@ -57,36 +55,40 @@ const FONT: &[u8] = include_bytes!("../../assets/fonts/NotoSansJP-Regular.otf");
 /// points — 7pt at three times over is 21 pixels, which is where a CJK glyph starts to mush.
 const OVERSAMPLE: f32 = 4.0;
 
-/// The sizes are in points, and they are the sizes this is read at on the page.
+/// Type sizes in points at the drawing's natural size.
 ///
 /// The address is set near the body size of the documents this goes on — an invoice or a contract
 /// runs at 10 or 10.5pt — because a signature block whose address is half the size of the address
 /// it sits under reads as a footnote rather than as a signature. The name is set well above it:
 /// it is the line the block exists for.
-const TITLE_SIZE: f32 = 8.0 * OVERSAMPLE;
-const LABEL_SIZE: f32 = 8.5 * OVERSAMPLE;
+const TITLE_SIZE: f32 = 8.5 * OVERSAMPLE;
+const LABEL_SIZE: f32 = 7.5 * OVERSAMPLE;
 const ADDRESS_SIZE: f32 = 9.0 * OVERSAMPLE;
 const NAME_SIZE: f32 = 17.0 * OVERSAMPLE;
 const WHEN_SIZE: f32 = 8.0 * OVERSAMPLE;
-const PADDING: f32 = 8.0 * OVERSAMPLE;
+const PADDING: f32 = 10.0 * OVERSAMPLE;
 /// Between a label and what it labels.
 const LABEL_GAP: f32 = 6.0 * OVERSAMPLE;
 /// Baseline to baseline within the address, which is the only thing here that takes two lines.
-const ADDRESS_LEADING: f32 = 1.25;
-const RULE: f32 = 0.9 * OVERSAMPLE;
+const ADDRESS_LEADING: f32 = 1.5;
+const SECTION_GAP: f32 = 6.0 * OVERSAMPLE;
+const NAME_GAP: f32 = 4.0 * OVERSAMPLE;
+const RULE_GAP: f32 = 3.0 * OVERSAMPLE;
+const RULE: f32 = 0.6 * OVERSAMPLE;
 
 /// How wide the drawing is allowed to get.
 ///
 /// Without a cap the width follows the longest string, and one long address turned the panel into
 /// a 346pt banner across half the page. Past this the address wraps, and then elides. 280pt is
-/// about 99mm: wide enough for a Tokyo address on one line, and still under a third of the usable
-/// width of A4.
+/// about 99mm; the normal block starts at 224pt (79mm) and widens only when the text needs it.
 const MAX_WIDTH: f32 = 280.0 * OVERSAMPLE;
+const MIN_WIDTH: f32 = 224.0 * OVERSAMPLE;
 /// The address is allowed this many lines before what is left is cut.
 const ADDRESS_LINES: usize = 2;
 
 const INK: Rgba<u8> = Rgba([0x14, 0x18, 0x1D, 0xFF]);
-/// The accent, darker than the interface's own. It carries the labels and the rule, never the
+const LABEL_INK: Rgba<u8> = Rgba([0x56, 0x60, 0x6A, 0xFF]);
+/// The accent, darker than the interface's own. It carries the heading and the rule, never the
 /// name — a document gets photocopied, and the name has to survive that. 11.0:1 on white, and
 /// 12.1:1 once a copier has thrown the colour away.
 const ACCENT: Rgba<u8> = Rgba([0x14, 0x3D, 0x6B, 0xFF]);
@@ -131,7 +133,7 @@ impl SignatureBlock {
     /// certificate made.
     ///
     /// The time is the *claimed* signing time, which is the only one available while the signature
-    /// is being made: a timestamp token does not exist until afterwards. It is labelled 日時 rather
+    /// is being made: a timestamp token does not exist until afterwards. It is labelled 署名日時 rather
     /// than anything that suggests it was attested.
     pub fn describe(certificate: &CertificateInfo, at: Timestamp) -> Self {
         let name = certificate
@@ -164,51 +166,61 @@ impl SignatureBlock {
     pub fn render(&self) -> Result<SignatureImage> {
         let font = FontRef::try_from_slice(FONT)
             .map_err(|e| Error::malformed(format!("the bundled font will not load: {e}")))?;
-        let title_font = font.as_scaled(PxScale::from(TITLE_SIZE));
-        let label_font = font.as_scaled(PxScale::from(LABEL_SIZE));
-        let address_font = font.as_scaled(PxScale::from(ADDRESS_SIZE));
-        let name_font = font.as_scaled(PxScale::from(NAME_SIZE));
-        let when_font = font.as_scaled(PxScale::from(WHEN_SIZE));
+        // PxScale measures ascent-to-descent height, not em size. Without this conversion the
+        // bundled font turned a requested 9pt address into 6.2pt text on paper. The image uses
+        // OVERSAMPLE pixels per PDF point, so there is no screen-DPI conversion here.
+        let em_height = font.height_unscaled()
+            / font
+                .units_per_em()
+                .ok_or_else(|| Error::malformed("the bundled font has no em size"))?;
+        let title_font = font.as_scaled(PxScale::from(TITLE_SIZE * em_height));
+        let label_font = font.as_scaled(PxScale::from(LABEL_SIZE * em_height));
+        let address_font = font.as_scaled(PxScale::from(ADDRESS_SIZE * em_height));
+        let name_font = font.as_scaled(PxScale::from(NAME_SIZE * em_height));
+        let when_font = font.as_scaled(PxScale::from(WHEN_SIZE * em_height));
 
-        // Both labels sit in one column, so the values line up under each other the way they do on
+        // All labels sit in one column, so the values line up under each other the way they do on
         // a printed form.
-        let label_width = width_of(&label_font, "住所").max(width_of(&label_font, "氏名"));
+        let label_width = width_of(&label_font, "署名日時");
         let value_x = PADDING + label_width + LABEL_GAP;
         let budget = MAX_WIDTH - value_x - PADDING;
 
         let address = self
             .address
             .as_deref()
+            .filter(|address| !address.trim().is_empty())
             .map(|a| wrap(&address_font, a, budget, ADDRESS_LINES))
             .unwrap_or_default();
         // A name is the one thing here worth widening the drawing for, but not without limit.
         let name = elide(&name_font, &self.name, budget);
+        let when = elide(&when_font, &self.when, budget);
+        let title = elide(&title_font, &self.title, MAX_WIDTH - PADDING * 2.0);
 
         let value_width = address
             .iter()
             .map(|line| width_of(&address_font, line))
             .chain(std::iter::once(width_of(&name_font, &name)))
+            .chain(std::iter::once(width_of(&when_font, &when)))
             .fold(0.0f32, f32::max);
         let width = (value_x + value_width + PADDING)
-            .max(PADDING * 2.0 + width_of(&title_font, &self.title))
-            .min(MAX_WIDTH);
+            .max(PADDING * 2.0 + width_of(&title_font, &title))
+            .clamp(MIN_WIDTH, MAX_WIDTH);
 
         // Laid out top down, in the order it is read.
         let address_line = ADDRESS_SIZE * ADDRESS_LEADING;
-        let mut y = PADDING + TITLE_SIZE;
-        let title_baseline = y;
-        y += TITLE_SIZE * 0.9;
+        let title_baseline = PADDING + title_font.ascent();
+        let mut y = title_baseline - title_font.descent() + SECTION_GAP;
 
-        let address_top = y + ADDRESS_SIZE;
-        y = address_top + address_line * address.len().saturating_sub(1) as f32;
+        let address_top = y + address_font.ascent();
         if !address.is_empty() {
-            y += ADDRESS_SIZE * 0.5;
+            y = address_top + address_line * (address.len() - 1) as f32 - address_font.descent()
+                + NAME_GAP;
         }
 
-        let name_baseline = y + NAME_SIZE;
-        let rule_y = name_baseline + NAME_SIZE * 0.28;
-        let when_baseline = rule_y + WHEN_SIZE * 1.6;
-        let height = when_baseline + WHEN_SIZE * 0.35 + PADDING;
+        let name_baseline = y + name_font.ascent();
+        let rule_y = name_baseline - name_font.descent() + RULE_GAP;
+        let when_baseline = rule_y + RULE + SECTION_GAP + when_font.ascent();
+        let height = when_baseline - when_font.descent() + PADDING;
 
         let mut canvas = RgbaImage::from_pixel(
             width.ceil().max(1.0) as u32,
@@ -219,7 +231,7 @@ impl SignatureBlock {
         draw_text(
             &mut canvas,
             &title_font,
-            &self.title,
+            &title,
             PADDING,
             title_baseline,
             ACCENT,
@@ -228,7 +240,14 @@ impl SignatureBlock {
         for (index, line) in address.iter().enumerate() {
             let baseline = address_top + address_line * index as f32;
             if index == 0 {
-                draw_text(&mut canvas, &label_font, "住所", PADDING, baseline, ACCENT);
+                draw_text(
+                    &mut canvas,
+                    &label_font,
+                    "住所",
+                    PADDING,
+                    baseline,
+                    LABEL_INK,
+                );
             }
             draw_text(&mut canvas, &address_font, line, value_x, baseline, INK);
         }
@@ -239,22 +258,23 @@ impl SignatureBlock {
             "氏名",
             PADDING,
             name_baseline,
-            ACCENT,
+            LABEL_INK,
         );
         draw_text(&mut canvas, &name_font, &name, value_x, name_baseline, INK);
 
         // The rule is what makes this read as a signature block rather than as a caption. It runs
         // under the name only, which is the line a reader is being asked to take as the signature.
-        draw_rule(&mut canvas, PADDING, width - PADDING, rule_y, ACCENT);
+        draw_rule(&mut canvas, value_x, width - PADDING, rule_y, ACCENT);
 
         draw_text(
             &mut canvas,
-            &when_font,
-            &self.when,
+            &label_font,
+            "署名日時",
             PADDING,
             when_baseline,
-            INK,
+            LABEL_INK,
         );
+        draw_text(&mut canvas, &when_font, &when, value_x, when_baseline, INK);
 
         let mut bytes = std::io::Cursor::new(Vec::new());
         image::DynamicImage::ImageRgba8(canvas)
@@ -264,7 +284,7 @@ impl SignatureBlock {
             bytes: bytes.into_inner(),
             // Drawn at `OVERSAMPLE` pixels per point, so this is the size the layout was designed
             // for. Placing it at anything else is scaling a picture of text.
-            natural_size: Some((width / OVERSAMPLE, height / OVERSAMPLE)),
+            natural_size: Some((width.ceil() / OVERSAMPLE, height.ceil() / OVERSAMPLE)),
         })
     }
 }
@@ -295,6 +315,12 @@ where
             }
             consumed += line.len();
             out.push(std::mem::take(&mut line));
+        }
+        // A room number normally stays together, but one indivisible run can itself be wider
+        // than the whole block. Mark the omission instead of letting the canvas crop it silently.
+        if width_of(font, unit) > limit {
+            out.push(elide(font, &text[consumed..], limit));
+            return out;
         }
         line.push_str(unit);
     }
@@ -481,6 +507,83 @@ mod tests {
     }
 
     #[test]
+    fn a_short_name_does_not_crop_the_end_of_the_signing_time() {
+        let short = SignatureBlock {
+            name: "李".into(),
+            address: None,
+            ..block()
+        };
+        let other_zone = SignatureBlock {
+            when: short.when.replace("JST", "UTC"),
+            ..short.clone()
+        };
+        // Previously the canvas width came only from the name/title. Both time zones were
+        // outside it, so changing the end of the timestamp changed no pixels at all.
+        assert_ne!(
+            short.render().unwrap().bytes,
+            other_zone.render().unwrap().bytes,
+            "the end of the signing time is not visible"
+        );
+    }
+
+    #[test]
+    fn the_name_is_readable_at_its_print_size() {
+        let panel = SignatureBlock {
+            name: "田".into(),
+            ..Default::default()
+        };
+        let drawn = decode(&panel.render().unwrap());
+        // Only the name uses this dark ink when the date and address are absent. This bundled
+        // CJK glyph occupies most of one em. Confusing PxScale height with em size used to make
+        // its printed width less than ten points despite requesting a seventeen-point name.
+        let mut columns = drawn
+            .enumerate_pixels()
+            .filter(|(_, _, pixel)| pixel.0[..3].iter().all(|channel| *channel < 60))
+            .map(|(x, _, _)| x);
+        let first = columns.next().expect("the name was not drawn");
+        let (left, right) = columns.fold((first, first), |(left, right), x| {
+            (left.min(x), right.max(x))
+        });
+        let ink_width = (right - left + 1) as f32;
+        assert!(
+            ink_width >= NAME_SIZE * 0.75,
+            "the name is only {}pt wide on paper",
+            ink_width / OVERSAMPLE
+        );
+    }
+
+    #[test]
+    fn blank_addresses_do_not_reserve_an_empty_row() {
+        let without = SignatureBlock {
+            address: None,
+            ..block()
+        };
+        let expected = without.render().unwrap();
+        for address in ["", " \t　"] {
+            let blank = SignatureBlock {
+                address: Some(address.into()),
+                ..without.clone()
+            };
+            assert_eq!(blank.render().unwrap().bytes, expected.bytes);
+        }
+        let with_address = block().render().unwrap();
+        assert!(with_address.natural_size.unwrap().1 > expected.natural_size.unwrap().1);
+    }
+
+    #[test]
+    fn natural_size_preserves_the_raster_proportions_exactly() {
+        let image = block().render().unwrap();
+        let drawn = decode(&image);
+        assert_eq!(
+            image.natural_size,
+            Some((
+                drawn.width() as f32 / OVERSAMPLE,
+                drawn.height() as f32 / OVERSAMPLE
+            ))
+        );
+    }
+
+    #[test]
     fn japanese_actually_appears() {
         // The bundled font is the whole reason this module exists. If a CJK glyph silently drew
         // nothing, the panel would still be a valid PNG — and blank where the name should be.
@@ -576,5 +679,19 @@ mod tests {
             lines.last().unwrap().ends_with('…'),
             "silently dropped the rest: {lines:?}"
         );
+    }
+
+    #[test]
+    fn an_oversized_digit_run_is_marked_instead_of_cropped() {
+        let font = FontRef::try_from_slice(FONT).unwrap();
+        let scaled = font.as_scaled(PxScale::from(ADDRESS_SIZE));
+        let limit = 80.0 * OVERSAMPLE;
+        for prefix in ["", "東京都千代田区"] {
+            let text = format!("{prefix}{}号室", "１２３４５６７８９０".repeat(12));
+            let lines = wrap(&scaled, &text, limit, ADDRESS_LINES);
+            assert!(lines.len() <= ADDRESS_LINES);
+            assert!(lines.last().unwrap().ends_with('…'));
+            assert!(lines.iter().all(|line| width_of(&scaled, line) <= limit));
+        }
     }
 }

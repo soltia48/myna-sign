@@ -601,6 +601,7 @@ export function PdfPlacement({
             min={1}
             max={Math.max(sizes.length, 1)}
             value={current}
+            disabled={loading || !!error || sizes.length === 0}
             // On change rather than on input: a page number is not finished until the signer says
             // it is, and jumping at "1" on the way to "12" moves the view and then rewrites what
             // was typed.
@@ -630,7 +631,7 @@ export function PdfPlacement({
           class="ghost small"
           aria-label="縮小"
           onClick={() => stepZoom(-1)}
-          disabled={zoom <= ZOOM_STEPS[0]}
+          disabled={loading || !!error || zoom <= ZOOM_STEPS[0]}
         >
           −
         </button>
@@ -640,18 +641,30 @@ export function PdfPlacement({
           class="ghost small"
           aria-label="拡大"
           onClick={() => stepZoom(1)}
-          disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+          disabled={loading || !!error || zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
         >
           +
         </button>
-        <button type="button" class="ghost small" onClick={() => setZoom(1)}>
+        <button
+          type="button"
+          class="ghost small"
+          onClick={() => setZoom(1)}
+          disabled={loading || !!error}
+        >
           ページ全体に合わせる
         </button>
       </div>
 
-      {error && <p class="error">プレビューを表示できません。{error}</p>}
+      <div role="status">
+        {error && <p class="error">プレビューを表示できません。{error}</p>}
+      </div>
 
-      <div class="page-viewport" ref={scroller} style={{ maxHeight: VIEWPORT_HEIGHT }}>
+      <div
+        class="page-viewport"
+        ref={scroller}
+        aria-busy={loading}
+        style={{ maxHeight: VIEWPORT_HEIGHT }}
+      >
         {loading && <p class="page-loading-inline">読み込み中…</p>}
         {sizes.map((size, index) => {
           const number = index + 1;
@@ -721,7 +734,7 @@ export function PdfPlacement({
 
       {/* Always present, never conditionally inserted: a live region added to the page at the
           moment it has something to say is often not announced at all. */}
-      <p class="visually-hidden" aria-live="polite">
+      <p class="visually-hidden" role="status" aria-atomic="true">
         {rect
           ? `${page} ページ目。左下から右へ ${Math.round(rect[0])}pt、上へ ${Math.round(rect[1])}pt、` +
             `幅 ${Math.round(rect[2] - rect[0])}pt、高さ ${Math.round(rect[3] - rect[1])}pt。` +

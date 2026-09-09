@@ -327,24 +327,23 @@ export function PasswordDialog({
 
           {/* The only part that scrolls. Everything outside it — the title, the field, the attempt
               count, the buttons — stays where it is at any window size the application allows. */}
-          <div class="dialog-body">
+          <div
+            class="dialog-body"
+            role="region"
+            aria-label="署名対象と開示する情報"
+            tabIndex={0}
+          >
           <section class="subject">
             <p class="subject-lead" id="pw-subject-lead">
               以下に電子署名します。
             </p>
-            {/* Ten files must not turn the dialog into a page whose bottom half has to be hunted
-                for: the list keeps a fixed share of the window and scrolls within it. It takes a
-                tab stop of its own, because a scrolling box with no focusable children is one that
-                a keyboard cannot reach the bottom of — and the bottom is a file being signed. */}
-            <ul
-              tabIndex={0}
-              aria-labelledby="pw-subject-lead"
-              style={{ maxHeight: "30vh", overflowY: "auto" }}
-            >
+            {/* The files and disclosure share one keyboard-scrollable region. A second scroller
+                on this list would consume the arrow keys before they could reach the disclosure. */}
+            <ul aria-labelledby="pw-subject-lead">
               {subjects.map((subject) => (
                 <li key={subject.digest + subject.label}>
                   <span class="subject-name">{subject.label}</span>
-                  <code class="digest">SHA-256 {subject.digest.slice(0, 32)}…</code>
+                  <code class="digest">SHA-256 {subject.digest}</code>
                 </li>
               ))}
             </ul>
@@ -376,6 +375,8 @@ export function PasswordDialog({
               </span>
               <input
                 ref={input}
+                id="sign-password"
+                name="sign-password"
                 type={reveal ? "text" : "password"}
                 autocomplete="off"
                 autocorrect="off"
@@ -402,8 +403,9 @@ export function PasswordDialog({
               type="button"
               class="ghost small"
               aria-label={reveal ? "パスワードを隠す" : "パスワードを表示"}
+              aria-controls="sign-password"
               onClick={() => setReveal(!reveal)}
-              disabled={blocked}
+              disabled={busy || blocked}
             >
               {reveal ? "隠す" : "表示"}
             </button>
@@ -433,7 +435,7 @@ export function PasswordDialog({
               <button
                 type="submit"
                 class={needsConfirmation ? "danger" : ""}
-                disabled={busy || blocked || password.length === 0}
+                disabled={busy || blocked}
               >
                 {busy
                   ? "確認中…"

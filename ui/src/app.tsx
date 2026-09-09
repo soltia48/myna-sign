@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 import { banner, screen, signBusy, signProgress, type Screen } from "./lib/state";
 import { CardScreen, SettingsScreen, SignScreen, VerifyScreen } from "./components/screens";
+import { Icon } from "./components/Icon";
 
 const TABS: [Screen, string][] = [
   ["card", "カード"],
@@ -123,33 +124,41 @@ export function App() {
 
   return (
     <div class="app">
+      <a class="skip-link" href="#main-content">本文へ移動</a>
       {/* Tabs and message in one sticky wrapper: the message is about what the buttons above it
           just did, and it is worth nothing once it has scrolled away. Sticking the wrapper rather
           than its parts keeps the offset out of the stylesheet — the strip is as tall as the font
           makes it. */}
       <div class="topbar">
-        <nav class="tabs" role="tablist" aria-label="画面">
-          {TABS.map(([id, label], index) => (
-            <button
-              key={id}
-              id={`tab-${id}`}
-              ref={(element) => {
-                tabs.current[index] = element;
-              }}
-              class="tab"
-              role="tab"
-              type="button"
-              aria-selected={current === id}
-              aria-controls={`panel-${id}`}
-              tabIndex={focused === index ? 0 : -1}
-              onClick={() => select(id)}
-              onKeyDown={(event) => move(event, index)}
-            >
-              {label}
-              {id === "sign" && signBusy.value && <span class="tab-busy">実行中</span>}
-            </button>
-          ))}
-        </nav>
+        <div class="navigation-row">
+          <div class="identity">
+            <Icon name="sign" />
+            <span>Myna Sign</span>
+          </div>
+          <nav class="tabs" role="tablist" aria-label="画面">
+            {TABS.map(([id, label], index) => (
+              <button
+                key={id}
+                id={`tab-${id}`}
+                ref={(element) => {
+                  tabs.current[index] = element;
+                }}
+                class="tab"
+                role="tab"
+                type="button"
+                aria-selected={current === id}
+                aria-controls={`panel-${id}`}
+                tabIndex={focused === index ? 0 : -1}
+                onClick={() => select(id)}
+                onKeyDown={(event) => move(event, index)}
+              >
+                <Icon name={id} />
+                {label}
+                {id === "sign" && signBusy.value && <span class="tab-busy">実行中</span>}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         {/* Both regions stand whether or not there is anything to say. A live region added to the
             page at the same moment as its text is often read as ordinary content and announced by
@@ -176,7 +185,7 @@ export function App() {
 
       {/* The panels live inside <main> rather than being it: a `role` on <main> would replace the
           landmark, and the one landmark this window has is worth more than a tidier tree. */}
-      <main>
+      <main id="main-content" tabIndex={-1}>
         {TABS.map(([id]) => (
           <div
             key={id}

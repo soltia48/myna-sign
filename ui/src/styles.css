@@ -44,7 +44,7 @@
   --unknown-bg: #eef0f2;
 
   /* Four steps. `--fs-sm` is the aside; body is 1rem; the two above it are headings. */
-  --fs-sm: 0.86rem;
+  --fs-sm: 0.875rem;
   --fs-lg: 1.05rem;
   --fs-xl: 1.4rem;
 
@@ -108,7 +108,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.6 system-ui, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  font: 0.9375rem/1.6 system-ui, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  overflow-wrap: anywhere;
 }
 
 /* The user agent already shrinks `small`, and every use of it here also carried a class that set
@@ -191,7 +192,6 @@ button.ghost:focus-visible,
   display: flex;
   gap: var(--sp-1);
   padding: var(--sp-3) 0;
-  border-bottom: 1px solid var(--border);
 }
 
 /* Says a run is still going after the user has left the screen that started it. Deliberately
@@ -210,6 +210,10 @@ button.ghost:focus-visible,
   color: var(--muted);
   font: inherit;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
 }
 
 .tab.active,
@@ -227,6 +231,11 @@ h1 {
   margin: var(--sp-5) 0 var(--sp-4);
 }
 
+h1, h2 {
+  line-height: 1.4;
+  text-wrap: balance;
+}
+
 h2 {
   font-size: var(--fs-lg);
   margin: 0 0 var(--sp-3);
@@ -242,13 +251,14 @@ h2 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: var(--sp-4);
-  margin-bottom: var(--sp-4);
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
 }
 
 .panel > summary {
   cursor: pointer;
   font-weight: 600;
+  min-height: 24px;
 }
 
 .row {
@@ -267,6 +277,9 @@ button {
   padding: var(--sp-2) var(--sp-4);
   font: inherit;
   cursor: pointer;
+  min-height: 40px;
+  max-width: 100%;
+  line-height: 1.5;
 }
 
 button:disabled {
@@ -283,6 +296,7 @@ button.ghost {
 button.small {
   padding: var(--sp-1) var(--sp-2);
   font-size: var(--fs-sm);
+  min-height: 32px;
 }
 
 button.danger {
@@ -415,6 +429,8 @@ button.ghost.destructive {
   gap: var(--sp-2);
   align-items: flex-start;
   margin-bottom: var(--sp-3);
+  cursor: pointer;
+  min-height: 24px;
 }
 
 /* The default 13px box is a small target for a choice that discloses an address. */
@@ -448,13 +464,14 @@ progress {
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
+  min-height: 32px;
 }
 
 /* --- Claims --- */
 
 .claim {
   display: grid;
-  grid-template-columns: 22px 11em 1fr;
+  grid-template-columns: 22px 11em minmax(0, 1fr);
   gap: var(--sp-2);
   align-items: baseline;
   padding: var(--sp-2) 0;
@@ -638,10 +655,6 @@ progress {
   cursor: pointer;
 }
 
-.claim-more > summary:hover {
-  color: var(--text);
-}
-
 .claim-more[open] > summary {
   margin-bottom: 2px;
 }
@@ -673,7 +686,7 @@ progress {
 .error,
 .holder,
 .disclosure {
-  font-size: 0.92rem;
+  font-size: inherit;
 }
 
 .readers,
@@ -690,6 +703,12 @@ progress {
   align-items: center;
   padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.readers li > code {
+  flex: 1 1 18rem;
+  min-width: 0;
 }
 
 /* What signing would put on the disk, shown before it happens rather than reported afterwards. */
@@ -701,7 +720,7 @@ progress {
 
 .planned-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--sp-1) var(--sp-3);
   align-items: baseline;
   padding: var(--sp-2) 0;
@@ -790,6 +809,7 @@ progress {
      the box does not shove the text sideways. Pulling the box wider with a negative margin would
      do the same job and overflow the form by the scrollbar's width. */
   scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 
 /* At 600px tall — the shortest window allowed — the file list and the disclosure do not both fit,
@@ -840,6 +860,7 @@ progress {
 .subject-name {
   display: block;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .digest {
@@ -892,6 +913,7 @@ progress {
   justify-content: flex-end;
   gap: var(--sp-2);
   margin-top: var(--sp-4);
+  flex-wrap: wrap;
 }
 
 .probe {
@@ -1013,4 +1035,381 @@ progress {
   white-space: nowrap;
   /* The tag sits over page content, which can be anything. */
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+
+/* Shared navigation and screen hierarchy. Keep actions in document order, including at zoom. */
+.icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  vertical-align: middle;
+}
+
+button > .icon {
+  margin-inline-start: var(--sp-1);
+}
+
+.tab > .icon {
+  margin: 0;
+}
+
+.identity > .icon,
+.tab[aria-selected="true"] > .icon {
+  stroke-width: 2;
+}
+
+.navigation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--sp-2);
+  inset-inline-start: var(--sp-4);
+  z-index: 30;
+  padding: var(--sp-2) var(--sp-4);
+  border: 2px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  transform: translateY(calc(-100% - var(--sp-4)));
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+.screen-heading {
+  margin-block: var(--sp-5);
+}
+
+.screen-heading h1 {
+  margin: 0 0 var(--sp-1);
+}
+
+.screen-heading p,
+.section-heading p,
+.sign-action p {
+  margin: 0;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.screen-heading p {
+  font-size: var(--fs-sm);
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.section-heading h2,
+.sign-action h2 {
+  margin: 0 0 var(--sp-1);
+}
+
+.section-heading > div {
+  flex: 1 1 12rem;
+}
+
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.section-icon .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.connection-state,
+.file-count {
+  margin-inline-start: auto;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  padding: 0;
+  margin: var(--sp-5) 0;
+  gap: var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
+.setup-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.setup-steps li > span {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.connection-actions,
+.planned-row > .row {
+  margin-bottom: 0;
+}
+
+.card-notes,
+.verify-guide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-5);
+  padding-block: var(--sp-2);
+  margin-block: var(--sp-5);
+}
+
+.card-notes h2,
+.verify-guide h2 {
+  font-size: var(--fs-sm);
+  margin: 0 0 var(--sp-2);
+}
+
+.card-notes p,
+.verify-guide p,
+.verify-guide ul {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.verify-guide ul {
+  padding-inline-start: var(--sp-4);
+}
+
+.verify-guide li + li {
+  margin-top: var(--sp-1);
+}
+
+.file-picker {
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+
+.file-picker .section-icon {
+  margin-bottom: var(--sp-4);
+  background: var(--surface);
+}
+
+.file-picker h2 {
+  color: var(--text);
+}
+
+.file-picker .note {
+  margin: 0 0 var(--sp-4);
+}
+
+.sign-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.sign-action > div {
+  flex: 1 1 18rem;
+}
+
+.sign-action > button {
+  flex: none;
+}
+
+.tsa-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--sp-4);
+}
+
+.tsa-options legend {
+  margin-bottom: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.tsa-options .check {
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-md);
+}
+
+.tsa-options .check:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.tsa-options .check:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+/* Instant feedback suits frequent controls and stays identical with reduced motion enabled. */
+@media (hover: hover) {
+  button:not(:disabled):hover,
+  .copy:hover {
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+
+  button.ghost:not(:disabled):hover,
+  .tab:not([aria-selected="true"]):hover,
+  .tsa-options .check:not(:has(input:disabled)):hover {
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .claim-more > summary:hover,
+  .panel > summary:hover {
+    color: var(--accent);
+  }
+}
+
+button:not(:disabled):active {
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+
+/* Three-column claims and long file actions need stacking before labels lose their measure. */
+@media (max-width: 40rem) {
+  .navigation-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .identity {
+    padding-top: var(--sp-3);
+  }
+
+  .tabs {
+    width: 100%;
+  }
+
+  .tab {
+    flex: 1 1 0;
+    padding-inline: var(--sp-2);
+  }
+
+  :root {
+    --tabs-height: 112px;
+  }
+
+  .claim {
+    grid-template-columns: 22px minmax(0, 1fr);
+    row-gap: var(--sp-1);
+  }
+
+  .claim > :last-child {
+    grid-column: 2;
+  }
+
+  .planned-row,
+  .holder,
+  .setup-steps,
+  .card-notes,
+  .verify-guide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .holder dd + dt {
+    margin-top: var(--sp-2);
+  }
+
+  .planned-row {
+    padding-block: var(--sp-3);
+    gap: var(--sp-3);
+  }
+
+  .planned-badge {
+    justify-self: start;
+    white-space: normal;
+  }
+
+  .panel {
+    padding: var(--sp-4);
+  }
+
+  .dialog {
+    padding: var(--sp-4);
+    width: calc(100% - var(--sp-5));
+    max-height: calc(100dvh - var(--sp-5));
+  }
+
+  .banner {
+    align-items: flex-start;
+  }
+
+  .banner > button {
+    flex: none;
+  }
+}
+
+@media (max-width: 28rem) {
+  .tab .icon {
+    display: none;
+  }
+
+  .tab-busy {
+    margin: 0;
+  }
+
+  .tab {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+
+  .tsa-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .field input,
+  .page-jump input {
+    font-size: 1rem;
+  }
+}
+
+/* Keep native system colors for keyboard focus and selection in high-contrast themes. */
+@media (forced-colors: active) {
+  :focus-visible,
+  button:focus-visible,
+  button.ghost:focus-visible,
+  .tab:focus-visible,
+  .copy:focus-visible {
+    outline-color: Highlight;
+  }
+
+  .tabs [role="tab"][aria-selected="true"],
+  .tsa-options .check:has(input:checked) {
+    border-color: Highlight;
+  }
 }

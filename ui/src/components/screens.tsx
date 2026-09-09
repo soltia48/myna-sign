@@ -83,6 +83,7 @@ import {
 import { PasswordDialog, type Disclosure, type SigningSubject } from "./PasswordDialog";
 import { PdfPlacement } from "./PdfPlacement";
 import { Claim, Signer, TimestampClaim, VerdictGroups } from "./Verdict";
+import { Icon } from "./Icon";
 
 const basename = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
@@ -224,27 +225,44 @@ export function CardScreen() {
   const retries = status?.signPinRetries ?? null;
   return (
     <section class="screen">
-      <h1>カード</h1>
+      <header class="screen-heading">
+        <h1>カード</h1>
+        <p>マイナンバーカードを接続して、電子署名の準備をします。</p>
+      </header>
 
-      <div class="row">
-        <button onClick={refresh} disabled={busy}>
-          リーダーを探す
-        </button>
-        <button onClick={() => connectCard(null)} disabled={busy}>
-          接続
-        </button>
-        <button class="ghost" onClick={disconnectCard} disabled={busy || !status}>
-          切断
-        </button>
+      <div class="panel connection-panel">
+        <div class="section-heading">
+          <span class="section-icon"><Icon name="card" /></span>
+          <div>
+            <h2>{status ? "カードを読み取りました" : "カードを接続してください"}</h2>
+            <p class="note">{status ? "証明書とパスワードの残り回数を、下で確認できます。" : "カードリーダーとマイナンバーカードを用意します。"}</p>
+          </div>
+          <span class="connection-state">{status ? "接続済み" : "未接続"}</span>
+        </div>
+        {!status && (
+          <ol class="setup-steps">
+            <li><span>1</span>リーダーを PC に接続</li>
+            <li><span>2</span>カードをセット</li>
+            <li><span>3</span>「カードを接続」を選択</li>
+          </ol>
+        )}
+        <div class="row connection-actions">
+          {status ? (
+            <>
+              {status.hasSignCertificate && retries !== 0 && (
+                <button onClick={() => (screen.value = "sign")} disabled={busy}>
+                  署名へ進む <Icon name="arrow" />
+                </button>
+              )}
+              <button class="ghost" onClick={disconnectCard} disabled={busy}>カードを切断</button>
+            </>
+          ) : (
+            <button onClick={() => connectCard(null)} disabled={busy}>カードを接続</button>
+          )}
+          <button class="ghost" onClick={refresh} disabled={busy}>リーダーを探す</button>
+          <span class="note" role="status">{busy ? "カードリーダーと通信中…" : ""}</span>
+        </div>
       </div>
-
-      <p class="note">
-        接続時に読み出すのは利用者証明用電子証明書だけです。署名用電子証明書（氏名・住所・生年月日・性別）は、署名するときにパスワードを入力するまで読み出しません。
-      </p>
-      <p class="note">
-        接続している間、本アプリはカードを占有します。切断するまで、e-Tax や JPKI
-        利用者ソフトなどからはこのカードを使えません。ほかのアプリが先に使っているときは接続できません。
-      </p>
 
       {readers !== null && readers.length === 0 && (
         <div class="empty">
@@ -261,7 +279,7 @@ export function CardScreen() {
           {readers.map((reader) => (
             <li key={reader}>
               <code>{reader}</code>
-              <button class="ghost small" onClick={() => connectCard(reader)} disabled={busy}>
+              <button class="ghost small" aria-label={`これに接続: ${reader}`} onClick={() => connectCard(reader)} disabled={busy}>
                 これに接続
               </button>
             </li>
@@ -307,6 +325,17 @@ export function CardScreen() {
           <CertificateTable certificate={signCertificate.value} />
         </details>
       )}
+
+      <aside class="card-notes">
+        <div>
+          <h2>接続時に読み取る情報</h2>
+          <p class="note">読み出すのは利用者証明用電子証明書だけです。署名用電子証明書（氏名・住所・生年月日・性別）は、署名するときにパスワードを入力するまで読み出しません。</p>
+        </div>
+        <div>
+          <h2>ほかのアプリで使うとき</h2>
+          <p class="note">接続中は本アプリがカードを占有します。e-Tax や JPKI 利用者ソフトで使う前に、カードを切断してください。ほかのアプリが使用中のカードには接続できません。</p>
+        </div>
+      </aside>
     </section>
   );
 }
@@ -850,7 +879,10 @@ export function SignScreen() {
 
   return (
     <section class="screen">
-      <h1>署名</h1>
+      <header class="screen-heading">
+        <h1>署名</h1>
+        <p>ファイルと署名の設定を確認して、電子署名を付けます。</p>
+      </header>
 
       {!status ? (
         <div class="status-block">
@@ -859,7 +891,7 @@ export function SignScreen() {
           </p>
           <div class="row">
             <button onClick={() => connectCard(null)} disabled={cardBusy.value}>
-              接続
+              {cardBusy.value ? "接続中…" : "カードを接続"}
             </button>
             <button class="ghost" onClick={() => (screen.value = "card")}>
               カード画面を開く
@@ -899,34 +931,23 @@ export function SignScreen() {
         </div>
       )}
 
-      <div class="row">
-        <button onClick={() => choose(false)} disabled={busy}>
-          ファイルを選ぶ
-        </button>
-        <button
-          onClick={beginSigning}
-          disabled={
-            busy ||
-            files.length === 0 ||
-            !status ||
-            !status.hasSignCertificate ||
-            retries === 0
-          }
-        >
-          署名する
-        </button>
-      </div>
-
       {files.length === 0 ? (
-        <div class="empty">
-          <p>署名するファイルが選ばれていません。</p>
+        <div class="empty file-picker">
+          <span class="section-icon"><Icon name="file" /></span>
+          <h2>署名するファイルを選んでください</h2>
           <p class="note">
-            「ファイルを選ぶ」を押すか、この画面にファイルをドロップしてください。PDF を 1 つだけ選ぶと、その中に署名を埋め込みます。
+            この画面にファイルをドロップすることもできます。<br />PDF を 1 つだけ選ぶと、PDF の中に署名を埋め込みます。
           </p>
+          <button class={status ? "" : "ghost"} onClick={() => choose(false)} disabled={busy}>
+            ファイルを選ぶ
+          </button>
         </div>
       ) : (
         <div class="panel">
-          <h2>署名するファイル</h2>
+          <div class="section-heading">
+            <h2>署名するファイル</h2>
+            <span class="note file-count">{files.length} 件 · {isPdf ? "PDF 署名" : "OpenPGP 署名"}</span>
+          </div>
           <ul class="planned">
             {files.map((path) => {
               const output =
@@ -953,7 +974,7 @@ export function SignScreen() {
                     {output?.exists && (
                       <strong class="planned-badge">既存のファイルを上書きします</strong>
                     )}
-                    <button class="ghost small" onClick={() => removeFileAt(path)} disabled={busy}>
+                    <button class="ghost small" aria-label={`${basename(path)} を外す`} onClick={() => removeFileAt(path)} disabled={busy}>
                       外す
                     </button>
                   </div>
@@ -964,6 +985,9 @@ export function SignScreen() {
           <div class="row">
             <button class="ghost" onClick={() => choose(true)} disabled={busy}>
               さらに追加
+            </button>
+            <button class="ghost" onClick={() => choose(false)} disabled={busy}>
+              選び直す
             </button>
           </div>
           {!isPdf && files.some((path) => path.toLowerCase().endsWith(".pdf")) && (
@@ -1077,7 +1101,7 @@ export function SignScreen() {
         <div class="panel">
           <h2>PDF 署名</h2>
           <p class="warn-box">
-            この PDF には署名用電子証明書が必ず同梱され、受け取った人は氏名・住所・生年月日・性別を読み出せます。外す選択肢はありません（外すと誰も検証できなくなるためです）。署名欄には氏名と住所が印字されます。
+            この PDF には署名用電子証明書が必ず同梱され、受け取った人は氏名・住所・生年月日・性別を読み出せます。外す選択肢はありません（外すと誰も検証できなくなるためです）。自動生成の署名欄には氏名と住所が印字されます。
           </p>
           <label class="field">
             <span>理由</span>
@@ -1146,6 +1170,21 @@ export function SignScreen() {
       )}
 
       <TsaPicker />
+
+      {files.length > 0 && (
+        <div class="panel sign-action">
+          <div>
+            <h2>{files.length} 件のファイルに署名します</h2>
+            <p class="note" id="sign-action-hint">
+              {!status ? "カードを接続すると署名できます。" : !status.hasSignCertificate ? "このカードには署名用電子証明書がありません。" : retries === 0 ? PIN_BLOCKED.sentence : "次に署名対象と開示される情報を確認し、パスワードを入力します。"}
+            </p>
+          </div>
+          <button onClick={beginSigning} aria-describedby="sign-action-hint"
+            disabled={busy || !status || !status.hasSignCertificate || retries === 0}>
+            {busy ? "署名処理中…" : "署名する"}<Icon name="arrow" />
+          </button>
+        </div>
+      )}
 
       {progress && (
         <div class="progress-row">
@@ -1680,7 +1719,10 @@ export function VerifyScreen() {
 
   return (
     <section class="screen">
-      <h1>検証</h1>
+      <header class="screen-heading">
+        <h1>検証</h1>
+        <p>署名と文書を確認します。カード・パスワード・通信は必要ありません。</p>
+      </header>
 
       {testHierarchy && (
         <div class="warn-box">
@@ -1712,11 +1754,12 @@ export function VerifyScreen() {
             </div>
             <div class="row">
               <button class="ghost" onClick={pickSignature} disabled={busy}>
-                選ぶ…
+                署名ファイルを選ぶ
               </button>
               {signaturePath && (
                 <button
                   class="ghost small"
+                  aria-label="署名ファイルを外す"
                   onClick={() => (verifySignaturePath.value = null)}
                   disabled={busy}
                 >
@@ -1742,11 +1785,12 @@ export function VerifyScreen() {
             </div>
             <div class="row">
               <button class="ghost" onClick={pickDocument} disabled={busy || slotIsPdf}>
-                選ぶ…
+                原本を選ぶ
               </button>
               {documentPath && !slotIsPdf && (
                 <button
                   class="ghost small"
+                  aria-label="原本を外す"
                   onClick={() => (verifyDocumentPath.value = null)}
                   disabled={busy}
                 >
@@ -1758,7 +1802,7 @@ export function VerifyScreen() {
         </ul>
         <div class="row">
           <button onClick={run} disabled={busy || missing !== null}>
-            検証する
+            {busy ? "検証中…" : "検証する"}
           </button>
         </div>
         {missing && (
@@ -1769,25 +1813,21 @@ export function VerifyScreen() {
       </div>
 
       {outcome === null && (
-        <div class="empty">
-          <p>
-            <strong>この画面で分かること</strong>
-          </p>
-          <ul style={{ display: "inline-block", textAlign: "left" }}>
-            <li>その署名が、表示している証明書の鍵で作られたものかどうか</li>
-            <li>署名の対象になったファイルが、署名の後で変わっていないかどうか</li>
-            <li>証明書が J-LIS のルートまでつながるかどうか</li>
-            <li>タイムスタンプがあるかどうか、あるならその時刻</li>
-          </ul>
-          <p>
-            <strong>この画面で分からないこと</strong>
-          </p>
-          <p class="note">
-            証明書が失効していないかどうかは確認しません。本アプリは JPKI
-            失効情報サービスを参照しないため、失効した証明書による署名でも、この画面の表示は変わりません。
-          </p>
-          <p class="note">検証にカード・パスワード・通信は必要ありません。</p>
-        </div>
+        <aside class="verify-guide">
+          <div>
+            <h2>この画面で確認すること</h2>
+            <ul class="note">
+              <li>表示している証明書の鍵による署名か</li>
+              <li>署名の後で文書が変わっていないか</li>
+              <li>証明書が J-LIS のルートまでつながるか</li>
+              <li>タイムスタンプの有無と、その時刻</li>
+            </ul>
+          </div>
+          <div>
+            <h2>失効確認は行いません</h2>
+            <p class="note">本アプリは JPKI 失効情報サービスを参照しません。失効した証明書による署名でも、検証結果の表示は変わりません。</p>
+          </div>
+        </aside>
       )}
 
       {outcome?.kind === "error" && (
@@ -1925,7 +1965,10 @@ export function VerifyScreen() {
 export function SettingsScreen() {
   return (
     <section class="screen">
-      <h1>設定</h1>
+      <header class="screen-heading">
+        <h1>設定</h1>
+        <p>タイムスタンプの送信先と、証明書の検証方針を設定します。</p>
+      </header>
       <TsaPicker withTest />
       <div class="panel">
         <h2>検証</h2>
@@ -2001,15 +2044,15 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
       <h2>タイムスタンプ</h2>
       {/* A fieldset in a flex or grid context keeps its own min-content width unless told not to,
           which pushes the panel wider than the window. */}
-      <fieldset style={{ minWidth: 0, border: 0, padding: 0, margin: 0 }}>
+      <fieldset class="tsa-options" disabled={busy}>
         <legend>送信先（「なし」以外を選ぶと外部サーバへ接続します）</legend>
         {(
           [
-            [{ kind: "none" }, "なし（既定）"],
-            [{ kind: "preset", preset: "freeTsa" }, `FreeTSA（${TSA_PRESET_URL.freeTsa}）`],
-            [{ kind: "preset", preset: "digiCert" }, `DigiCert（${TSA_PRESET_URL.digiCert}）`],
-          ] as [TsaConfig, string][]
-        ).map(([config, label]) => (
+            [{ kind: "none" }, "なし（既定）", "外部通信なし"],
+            [{ kind: "preset", preset: "freeTsa" }, "FreeTSA", TSA_PRESET_URL.freeTsa],
+            [{ kind: "preset", preset: "digiCert" }, "DigiCert", TSA_PRESET_URL.digiCert],
+          ] as [TsaConfig, string, string][]
+        ).map(([config, label, detail]) => (
           <label class="check" key={label}>
             <input
               type="radio"
@@ -2017,7 +2060,7 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
               checked={JSON.stringify(current) === JSON.stringify(config)}
               onChange={() => (tsa.value = config)}
             />
-            <span>{label}</span>
+            <span>{label}<small>{detail}</small></span>
           </label>
         ))}
         <label class="check">
@@ -2027,13 +2070,17 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
             checked={current.kind === "custom"}
             onChange={() => (tsa.value = { kind: "custom", url: customTsaUrl.value })}
           />
-          <span>任意のサーバ</span>
+          <span>任意のサーバ<small>送信先 URL を指定</small></span>
         </label>
       </fieldset>
       {current.kind === "custom" && (
         <label class="field">
           <span>URL</span>
           <input
+            type="url"
+            name="tsa-url"
+            spellcheck={false}
+            disabled={busy}
             value={customTsaUrl.value}
             placeholder="https://tsa.example/tsr"
             onInput={(e) => {
@@ -2070,7 +2117,7 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
               onClick={test}
               disabled={busy || current.kind === "none" || emptyCustom}
             >
-              接続テスト
+              {busy ? "接続テスト中…" : "接続テスト"}
             </button>
           </div>
           {current.kind === "none" && (
@@ -2079,7 +2126,7 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
             </p>
           )}
           {emptyCustom && <p class="note">URL が空のあいだは接続テストできません。</p>}
-          {probeError && <p class="error">{probeError}</p>}
+          <div role="status">{probeError && <p class="error">{probeError}</p>}</div>
           {probe && (
             <div class="result">
               <Claim label="応答時刻" tone="ok" state={null}>
