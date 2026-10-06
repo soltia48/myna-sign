@@ -57,7 +57,7 @@ spki = "0.7"
 x509-cert = "0.2"
 cms = { version = "0.2", features = ["builder"] }
 x509-tsp = "0.1"
-lopdf = { version = "0.44", default-features = false }
+lopdf = { version = "0.45", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 ab_glyph = "0.2"
 
