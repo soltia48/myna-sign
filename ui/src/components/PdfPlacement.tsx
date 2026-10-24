@@ -742,19 +742,11 @@ export function PdfPlacement({
           : "署名の位置はまだ指定されていません。"}
       </p>
 
-      <small class="note">
-        {provisional
-          ? "この位置に署名されます。変えたいときは、どのページでもドラッグしてください。"
-          : "どのページでもドラッグすると、そのページに署名が置かれます。"}
-        {rect && (
-          <>
-            現在は {page} ページ目の PDF 座標 [{rect.map((n) => Math.round(n)).join(" ")}]
-            （原点は左下）。
-          </>
-        )}
-      </small>
+      <small class="note">ドラッグで、どのページにでも置き直せます。</small>
 
-      <small class="note" id={helpId}>
+      {/* Drawn only while a page has the keyboard, which is the only time it applies. Hidden, it is
+          still the pages' description: `aria-describedby` reads hidden text. */}
+      <small class="note placement-keys" id={helpId}>
         キーボードでも指定できます。Tab でページに入り、PageUp / PageDown で前後のページへ、
         Enter でそのページに署名を置きます。矢印キーで 4pt、Shift と一緒に押すと 20pt 動きます。
         Alt と矢印キーで大きさを変えます（→ ↓ で大きく、← ↑ で小さく）。

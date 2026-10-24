@@ -735,6 +735,18 @@ progress {
   justify-self: end;
 }
 
+.planned-extra {
+  border-top: 1px solid var(--border);
+}
+
+.slot-label {
+  display: block;
+}
+
+.planned + .row {
+  margin-top: var(--sp-3);
+}
+
 /* --- Progress --- */
 
 .progress-row {
@@ -1099,16 +1111,10 @@ button > .icon {
   margin: 0 0 var(--sp-1);
 }
 
-.screen-heading p,
-.section-heading p,
 .sign-action p {
   margin: 0;
   color: var(--muted);
   text-wrap: pretty;
-}
-
-.screen-heading p {
-  font-size: var(--fs-sm);
 }
 
 .section-heading {
@@ -1122,10 +1128,6 @@ button > .icon {
 .section-heading h2,
 .sign-action h2 {
   margin: 0 0 var(--sp-1);
-}
-
-.section-heading > div {
-  flex: 1 1 12rem;
 }
 
 .section-icon {
@@ -1145,21 +1147,13 @@ button > .icon {
   height: 28px;
 }
 
-.connection-state,
-.file-count {
-  margin-inline-start: auto;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-}
-
 .setup-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   list-style: none;
   padding: 0;
-  margin: var(--sp-5) 0;
-  gap: var(--sp-4);
+  margin: var(--sp-4) 0 var(--sp-5);
+  gap: var(--sp-2) var(--sp-5);
   font-size: var(--fs-sm);
 }
 
@@ -1179,34 +1173,17 @@ button > .icon {
   margin-bottom: 0;
 }
 
-.card-notes,
-.verify-guide {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-5);
-  padding-block: var(--sp-2);
-  margin-block: var(--sp-5);
+.card-held {
+  margin: var(--sp-3) 0 0;
 }
 
-.card-notes h2,
-.verify-guide h2 {
-  font-size: var(--fs-sm);
-  margin: 0 0 var(--sp-2);
+/* Keyboard help for the placement, shown while a page has focus. */
+.placement:not(:focus-within) .placement-keys {
+  display: none;
 }
 
-.card-notes p,
-.verify-guide p,
-.verify-guide ul {
-  margin: 0;
-  text-wrap: pretty;
-}
-
-.verify-guide ul {
-  padding-inline-start: var(--sp-4);
-}
-
-.verify-guide li + li {
-  margin-top: var(--sp-1);
+.placement-keys {
+  display: block;
 }
 
 .file-picker {
@@ -1334,10 +1311,7 @@ button:not(:disabled):active {
   }
 
   .planned-row,
-  .holder,
-  .setup-steps,
-  .card-notes,
-  .verify-guide {
+  .holder {
     grid-template-columns: minmax(0, 1fr);
   }
 

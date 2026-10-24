@@ -168,8 +168,8 @@ export function VerdictGroups({
       {GROUPS.map(({ tone, heading }) => {
         const lines = claims.filter((line) => line.tone === tone);
         // Every group but the last appears only when something is in it. The last appears always:
-        // 失効確認 belongs to it, and so does the sentence below it, which is the one thing this
-        // screen has to say whatever the file turned out to be (§7.4).
+        // 失効確認 belongs to it, and that line is the one thing this screen has to say whatever the
+        // file turned out to be (§7.4). The claim says it in full, so nothing repeats it below.
         if (lines.length === 0 && tone !== "unknown") return null;
         const detached = bound ? [] : lines.filter(saysNothingAboutThisDocument);
         const attributed = bound
@@ -219,16 +219,6 @@ export function VerdictGroups({
                 </h4>
                 {detached.map(claimOf)}
               </div>
-            )}
-            {tone === "unknown" && (
-              /*
-                Body text, deliberately not `.note`. Setting this in the size and colour kept for
-                asides is how the reservation went missing in the first place; it is the sentence
-                the reader has to leave with.
-              */
-              <p>
-                本アプリは失効情報サービスを参照しません。証明書が失効していても、この画面の表示は変わりません。
-              </p>
             )}
           </div>
         );

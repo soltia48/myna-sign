@@ -227,23 +227,19 @@ export function CardScreen() {
     <section class="screen">
       <header class="screen-heading">
         <h1>カード</h1>
-        <p>マイナンバーカードを接続して、電子署名の準備をします。</p>
       </header>
 
       <div class="panel connection-panel">
         <div class="section-heading">
           <span class="section-icon"><Icon name="card" /></span>
-          <div>
-            <h2>{status ? "カードを読み取りました" : "カードを接続してください"}</h2>
-            <p class="note">{status ? "証明書とパスワードの残り回数を、下で確認できます。" : "カードリーダーとマイナンバーカードを用意します。"}</p>
-          </div>
-          <span class="connection-state">{status ? "接続済み" : "未接続"}</span>
+          <h2>{status ? "カードを読み取りました" : "カードを接続してください"}</h2>
         </div>
+        {/* What has to be true before the button can work. The button itself is the last step, so it
+            is not listed. */}
         {!status && (
           <ol class="setup-steps">
             <li><span>1</span>リーダーを PC に接続</li>
             <li><span>2</span>カードをセット</li>
-            <li><span>3</span>「カードを接続」を選択</li>
           </ol>
         )}
         <div class="row connection-actions">
@@ -262,14 +258,16 @@ export function CardScreen() {
           <button class="ghost" onClick={refresh} disabled={busy}>リーダーを探す</button>
           <span class="note" role="status">{busy ? "カードリーダーと通信中…" : ""}</span>
         </div>
+        {/* Said where the button that ends it is, and only while it is true. */}
+        {status && <p class="note card-held">接続中は、ほかのアプリからこのカードを使えません。</p>}
       </div>
 
       {readers !== null && readers.length === 0 && (
         <div class="empty">
           <p>カードリーダーが 1 台も見つかりませんでした。</p>
           <p class="note">
-            リーダーが接続されているか、PC/SC のサービス（Windows は「スマートカード」、Linux は
-            <code>pcscd</code>）が動いているかを確認してから、もう一度「リーダーを探す」を押してください。
+            リーダーの接続と、PC/SC サービス（Windows は「スマートカード」、Linux は <code>pcscd</code>
+            ）が動いているかを確認して、もう一度探してください。
           </p>
         </div>
       )}
@@ -303,7 +301,7 @@ export function CardScreen() {
           </Claim>
           <Claim label="署名用パスワード" tone={retriesTone(retries)}>
             {retriesSummary(retries)}
-            <small class="chain">{retriesConsequence(retries)}</small>
+            {retriesTone(retries) !== "ok" && <small class="chain">{retriesConsequence(retries)}</small>}
           </Claim>
         </div>
       )}
@@ -319,23 +317,12 @@ export function CardScreen() {
         <details class="panel" open>
           <summary>署名用電子証明書</summary>
           <p class="warn-box">
-            この証明書には基本4情報が含まれます。.asc では埋め込むかどうかを選べます。PDF
-            では必ず埋め込まれます。埋め込んだファイルを渡すことは、これらの情報を渡すことです。
+            下の基本4情報は、PDF の署名には必ず、.asc には選んだときに埋め込まれ、受け取った人が読めます。
           </p>
           <CertificateTable certificate={signCertificate.value} />
         </details>
       )}
 
-      <aside class="card-notes">
-        <div>
-          <h2>接続時に読み取る情報</h2>
-          <p class="note">読み出すのは利用者証明用電子証明書だけです。署名用電子証明書（氏名・住所・生年月日・性別）は、署名するときにパスワードを入力するまで読み出しません。</p>
-        </div>
-        <div>
-          <h2>ほかのアプリで使うとき</h2>
-          <p class="note">接続中は本アプリがカードを占有します。e-Tax や JPKI 利用者ソフトで使う前に、カードを切断してください。ほかのアプリが使用中のカードには接続できません。</p>
-        </div>
-      </aside>
     </section>
   );
 }
@@ -855,6 +842,14 @@ export function SignScreen() {
         publicKeyName: exportPublicKey.value ? publicKeyName : null,
       };
 
+  const signBlocked = !status
+    ? "カードを接続すると署名できます。"
+    : !status.hasSignCertificate
+      ? "このカードには署名用電子証明書がありません。"
+      : retries === 0
+        ? PIN_BLOCKED.sentence
+        : null;
+
   const unsignedCount = failure ? 1 + failure.skipped.length : 0;
   const accounted =
     results.length +
@@ -881,7 +876,6 @@ export function SignScreen() {
     <section class="screen">
       <header class="screen-heading">
         <h1>署名</h1>
-        <p>ファイルと署名の設定を確認して、電子署名を付けます。</p>
       </header>
 
       {!status ? (
@@ -911,17 +905,15 @@ export function SignScreen() {
           <p>
             {status.reader} ／ 署名用パスワード {retriesSummary(retries)}
           </p>
-          <p class="note">{retriesConsequence(retries)}</p>
+          {retriesTone(retries) !== "ok" && <p class="note">{retriesConsequence(retries)}</p>}
         </div>
       )}
 
       {signCertificate.value && (
         <div class="status-block">
           <p>
-            <strong>
-              このカードは、切断して状態をリセットするか、リーダーから取り外すまで、署名鍵のロックが解除されたままです。
-            </strong>
-            接続中は本アプリがカードを占有するため、ほかのアプリはこのカードを使えません。席を離れるときは、下のボタンで切断するか、カードをリーダーから取り外してください。取り外すと給電が切れ、解錠された状態も失われます。
+            <strong>署名鍵のロックは、切断するかカードを取り外すまで解除されたままです。</strong>
+            席を離れるときは切断してください。
           </p>
           <div class="row">
             <button class="ghost" onClick={disconnectCard} disabled={cardBusy.value || busy}>
@@ -934,20 +926,15 @@ export function SignScreen() {
       {files.length === 0 ? (
         <div class="empty file-picker">
           <span class="section-icon"><Icon name="file" /></span>
-          <h2>署名するファイルを選んでください</h2>
-          <p class="note">
-            この画面にファイルをドロップすることもできます。<br />PDF を 1 つだけ選ぶと、PDF の中に署名を埋め込みます。
-          </p>
+          <h2>署名するファイルを選ぶか、ここにドロップ</h2>
+          <p class="note">PDF を 1 つだけ選ぶと、PDF の中に署名を埋め込みます。</p>
           <button class={status ? "" : "ghost"} onClick={() => choose(false)} disabled={busy}>
             ファイルを選ぶ
           </button>
         </div>
       ) : (
         <div class="panel">
-          <div class="section-heading">
-            <h2>署名するファイル</h2>
-            <span class="note file-count">{files.length} 件 · {isPdf ? "PDF 署名" : "OpenPGP 署名"}</span>
-          </div>
+          <h2>署名するファイル</h2>
           <ul class="planned">
             {files.map((path) => {
               const output =
@@ -964,11 +951,6 @@ export function SignScreen() {
                       </>
                     )}
                     {folder && <small class="chain">{folder}</small>}
-                    {isPdf && (
-                      <small class="chain">
-                        保存先は「署名する」を押したときに選びます。元のファイルは変更しません。
-                      </small>
-                    )}
                   </div>
                   <div class="row">
                     {output?.exists && (
@@ -982,6 +964,24 @@ export function SignScreen() {
               );
             })}
           </ul>
+          {/* The files that come out besides the signatures, under the files they come from. */}
+          {!isPdf && planned.some((item) => item.kind !== "signature") && (
+            <ul class="planned planned-extra">
+              {planned
+                .filter((item) => item.kind !== "signature")
+                .map((item) => (
+                  <li key={item.path} class="planned-row">
+                    <div>
+                      <code>{basename(item.path)}</code>
+                      <small class="chain">{PLANNED_LABEL[item.kind]}</small>
+                    </div>
+                    {item.exists && (
+                      <strong class="planned-badge">既存のファイルを上書きします</strong>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          )}
           <div class="row">
             <button class="ghost" onClick={() => choose(true)} disabled={busy}>
               さらに追加
@@ -992,45 +992,15 @@ export function SignScreen() {
           </div>
           {!isPdf && files.some((path) => path.toLowerCase().endsWith(".pdf")) && (
             <p class="note">
-              複数のファイルを選んでいるため、PDF も OpenPGP 署名（.asc）になります。PDF の中に署名を埋め込むには、その 1 つだけを選んでください。
+              複数選んでいるため、PDF も .asc で署名します。PDF の中に埋め込むには、その 1 つだけを選んでください。
             </p>
           )}
-        </div>
-      )}
-
-      {!isPdf && planned.some((item) => item.kind !== "signature") && (
-        <div class="panel">
-          <h2>このほかに作成されるファイル</h2>
-          <ul class="planned">
-            {planned
-              .filter((item) => item.kind !== "signature")
-              .map((item) => (
-                <li key={item.path} class="planned-row">
-                  <div>
-                    <code>{basename(item.path)}</code>
-                    <small class="chain">
-                      {PLANNED_LABEL[item.kind]}
-                      {item.kind === "publicKey" && " — 先頭のファイルの隣に 1 つだけ作ります"}
-                    </small>
-                    {dirname(item.path) && <small class="chain">{dirname(item.path)}</small>}
-                  </div>
-                  {item.exists && (
-                    <strong class="planned-badge">既存のファイルを上書きします</strong>
-                  )}
-                </li>
-              ))}
-          </ul>
         </div>
       )}
 
       {files.length > 0 && !isPdf && (
         <div class="panel">
           <h2>OpenPGP 署名（.asc）</h2>
-          <p class="note">
-            {cleartext.value
-              ? "本文と署名を 1 つにまとめた〈元のファイル名〉.asc を作ります。元のファイルは 1 バイトも変更しません。相手には .asc だけを渡せば検証できます。"
-              : "元のファイルは 1 バイトも変更しません。同じ場所に〈元のファイル名〉.asc を作ります。相手には元のファイルと .asc の両方を渡してください。"}
-          </p>
           <label class="check">
             <input
               type="checkbox"
@@ -1042,8 +1012,7 @@ export function SignScreen() {
             <span>
               署名用電子証明書を埋め込む
               <small>
-                受け取った相手が単独で検証できるようになりますが、
-                <strong>氏名・住所・生年月日・性別が開示されます</strong>。
+                相手が単独で検証できます。<strong>氏名・住所・生年月日・性別が開示されます。</strong>
               </small>
             </span>
           </label>
@@ -1058,10 +1027,7 @@ export function SignScreen() {
             <span>
               OpenPGP 公開鍵も書き出す
               <small>
-                gpg で検証できるようになります。
-                {publicKeyName ?? "〈先頭ファイル名〉.pubkey.asc"}{" "}
-                を原本の隣に作ります。この鍵の User ID
-                には証明書の氏名が入るため、証明書を埋め込まない場合でも開示されます。
+                gpg で検証するためのものです。<strong>User ID に氏名が入ります。</strong>
               </small>
             </span>
           </label>
@@ -1073,27 +1039,23 @@ export function SignScreen() {
             />
             <span>
               クリアテキスト署名にする
-              <small>
-                本文と署名を 1 つの読めるファイルにまとめます。テキストファイルにのみ使えます。各行の末尾の空白は署名できないため取り除かれます。
-              </small>
+              <small>本文と署名を 1 つの .asc にまとめます。テキストのみ。行末の空白は取り除かれます。</small>
             </span>
           </label>
-          <label class="check">
-            <input
-              type="checkbox"
-              checked={writeTsr.value}
-              onChange={(e) => (writeTsr.value = (e.target as HTMLInputElement).checked)}
-              disabled={tsa.value.kind === "none"}
-            />
-            <span>
-              タイムスタンプトークンを .tsr としても書き出す
-              <small>
-                openssl ts -verify で単体検証できます。
-                {tsa.value.kind === "none" &&
-                  "タイムスタンプが「なし」のときは、チェックが入っていても .tsr は作られません。"}
-              </small>
-            </span>
-          </label>
+          {/* Offered only once there is a timestamp to write out. */}
+          {tsa.value.kind !== "none" && (
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={writeTsr.value}
+                onChange={(e) => (writeTsr.value = (e.target as HTMLInputElement).checked)}
+              />
+              <span>
+                タイムスタンプトークンを .tsr としても書き出す
+                <small>openssl ts -verify で単体検証できます。</small>
+              </span>
+            </label>
+          )}
         </div>
       )}
 
@@ -1101,7 +1063,7 @@ export function SignScreen() {
         <div class="panel">
           <h2>PDF 署名</h2>
           <p class="warn-box">
-            この PDF には署名用電子証明書が必ず同梱され、受け取った人は氏名・住所・生年月日・性別を読み出せます。外す選択肢はありません（外すと誰も検証できなくなるためです）。自動生成の署名欄には氏名と住所が印字されます。
+            PDF には署名用電子証明書が必ず入り、受け取った人は<strong>氏名・住所・生年月日・性別</strong>を読み出せます。
           </p>
           <label class="field">
             <span>理由</span>
@@ -1127,29 +1089,30 @@ export function SignScreen() {
             />
             <span>
               署名をページに表示しない
-              <small>
-                既定では、証明書の氏名・住所と日時を記した署名欄がページに描かれます。これを選ぶと、ページ上には何も現れません。ただし生年月日・性別を含む証明書は、枠の有無にかかわらず文書に入ります。見えないだけで、隠されているわけではありません。
-              </small>
+              <small>証明書は表示しなくても文書に入ります。</small>
             </span>
           </label>
 
-          <div class="row">
-            <button class="ghost" onClick={chooseImage} disabled={invisibleSignature.value}>
-              自分の画像を使う
-            </button>
-            {options.imagePath && (
-              <>
-                <code>{basename(options.imagePath)}</code>
-                <button class="ghost small" onClick={() => setOptions({ imagePath: null })}>
-                  外す
-                </button>
-              </>
-            )}
-          </div>
-          {invisibleSignature.value && (
-            <p class="note">
-              「署名をページに表示しない」を選んでいる間は、ページに何も描かないため画像も使いません。
-            </p>
+          {/* The image and the placement exist only for a signature that is drawn, so they leave
+              with it rather than staying behind disabled. */}
+          {!invisibleSignature.value && (
+            <div class="row">
+              <button class="ghost" onClick={chooseImage}>
+                自分の画像を使う
+              </button>
+              {options.imagePath && (
+                <>
+                  <code>{basename(options.imagePath)}</code>
+                  <button
+                    class="ghost small"
+                    aria-label={`${basename(options.imagePath)} を外す`}
+                    onClick={() => setOptions({ imagePath: null })}
+                  >
+                    外す
+                  </button>
+                </>
+              )}
+            </div>
           )}
           {!invisibleSignature.value && (
             <PdfPlacement
@@ -1163,9 +1126,6 @@ export function SignScreen() {
               }
             />
           )}
-          <p class="note">
-            署名は追記（インクリメンタル更新）で書き込みます。元の PDF のバイト列は変えないため、既存の署名は壊れません。
-          </p>
         </div>
       )}
 
@@ -1175,12 +1135,14 @@ export function SignScreen() {
         <div class="panel sign-action">
           <div>
             <h2>{files.length} 件のファイルに署名します</h2>
-            <p class="note" id="sign-action-hint">
-              {!status ? "カードを接続すると署名できます。" : !status.hasSignCertificate ? "このカードには署名用電子証明書がありません。" : retries === 0 ? PIN_BLOCKED.sentence : "次に署名対象と開示される情報を確認し、パスワードを入力します。"}
-            </p>
+            {/* Only the reason the button cannot be pressed. When it can, the dialog it opens is
+                its own explanation. */}
+            {signBlocked && (
+              <p class="note" id="sign-action-hint">{signBlocked}</p>
+            )}
           </div>
-          <button onClick={beginSigning} aria-describedby="sign-action-hint"
-            disabled={busy || !status || !status.hasSignCertificate || retries === 0}>
+          <button onClick={beginSigning} aria-describedby={signBlocked ? "sign-action-hint" : undefined}
+            disabled={busy || signBlocked !== null}>
             {busy ? "署名処理中…" : "署名する"}<Icon name="arrow" />
           </button>
         </div>
@@ -1721,15 +1683,13 @@ export function VerifyScreen() {
     <section class="screen">
       <header class="screen-heading">
         <h1>検証</h1>
-        <p>署名と文書を確認します。カード・パスワード・通信は必要ありません。</p>
       </header>
 
       {testHierarchy && (
         <div class="warn-box">
           <p>
-            <strong>JPKI テスト階層を受け入れる設定が ON です。</strong>
+            <strong>JPKI テスト階層を受け入れています。</strong>
             テストカードの署名も「ルートまで到達」と表示されます。
-            テストカードは実在の本人のマイナンバーカードではありません。
           </p>
           <div class="row">
             <button class="ghost small" onClick={() => (acceptTestHierarchy.value = false)}>
@@ -1744,8 +1704,7 @@ export function VerifyScreen() {
         <ul class="planned">
           <li class="planned-row">
             <div>
-              <strong>署名ファイル</strong>
-              <small class="chain">.asc / .sig、または署名済み PDF</small>
+              <strong class="slot-label">署名ファイル</strong>
               {signaturePath ? (
                 <code>{signaturePath}</code>
               ) : (
@@ -1768,26 +1727,22 @@ export function VerifyScreen() {
               )}
             </div>
           </li>
+          {/* A signed PDF is its own original, so the slot is not there to be filled. */}
+          {!slotIsPdf && (
           <li class="planned-row">
             <div>
-              <strong>原本</strong>
-              <small class="chain">
-                {slotIsPdf
-                  ? "署名済み PDF は原本を必要としません（PDF そのものが原本です）。"
-                  : "分離署名（.asc / .sig）が署名したファイルそのもの"}
-              </small>
-              {!slotIsPdf &&
-                (documentPath ? (
-                  <code>{documentPath}</code>
-                ) : (
-                  <small class="chain">未選択</small>
-                ))}
+              <strong class="slot-label">原本</strong>
+              {documentPath ? (
+                <code>{documentPath}</code>
+              ) : (
+                <small class="chain">未選択</small>
+              )}
             </div>
             <div class="row">
-              <button class="ghost" onClick={pickDocument} disabled={busy || slotIsPdf}>
+              <button class="ghost" onClick={pickDocument} disabled={busy}>
                 原本を選ぶ
               </button>
-              {documentPath && !slotIsPdf && (
+              {documentPath && (
                 <button
                   class="ghost small"
                   aria-label="原本を外す"
@@ -1799,36 +1754,21 @@ export function VerifyScreen() {
               )}
             </div>
           </li>
+          )}
         </ul>
-        <div class="row">
-          <button onClick={run} disabled={busy || missing !== null}>
+        {/* The empty slots above already say what is missing; the sentence is kept for the
+            button, which is otherwise disabled without a word. */}
+        <div class="row verify-run">
+          <button
+            onClick={run}
+            disabled={busy || missing !== null}
+            aria-describedby={missing ? "verify-missing" : undefined}
+          >
             {busy ? "検証中…" : "検証する"}
           </button>
+          {missing && <span class="visually-hidden" id="verify-missing">{missing}</span>}
         </div>
-        {missing && (
-          <div class="status-block">
-            <p>{missing}</p>
-          </div>
-        )}
       </div>
-
-      {outcome === null && (
-        <aside class="verify-guide">
-          <div>
-            <h2>この画面で確認すること</h2>
-            <ul class="note">
-              <li>表示している証明書の鍵による署名か</li>
-              <li>署名の後で文書が変わっていないか</li>
-              <li>証明書が J-LIS のルートまでつながるか</li>
-              <li>タイムスタンプの有無と、その時刻</li>
-            </ul>
-          </div>
-          <div>
-            <h2>失効確認は行いません</h2>
-            <p class="note">本アプリは JPKI 失効情報サービスを参照しません。失効した証明書による署名でも、検証結果の表示は変わりません。</p>
-          </div>
-        </aside>
-      )}
 
       {outcome?.kind === "error" && (
         <div class="panel">
@@ -1915,9 +1855,7 @@ export function VerifyScreen() {
             />
             <span>
               住所・生年月日・性別も含める
-              <small>
-                既定では含めません。書き出したテキストは誰でも読めます。渡す相手を決めてから入れてください。
-              </small>
+              <small>書き出したテキストは誰でも読めます。</small>
             </span>
           </label>
           <div class="row">
@@ -1925,9 +1863,6 @@ export function VerifyScreen() {
               結果をテキストで書き出す
             </button>
           </div>
-          <p class="note">
-            書き出すのは署名されていないただのテキストです。内容は誰でも書き換えられます。
-          </p>
         </div>
       )}
 
@@ -1951,9 +1886,6 @@ export function VerifyScreen() {
               );
             })}
           </ul>
-          <p class="note">
-            一覧に出るのは、検証できなかったものの理由だけです。うまくいった検証の要約は出しません。一行にまとめられる「有効」を、本アプリは出せないからです。中身は「表示」で確認してください。
-          </p>
         </div>
       )}
     </section>
@@ -1967,7 +1899,6 @@ export function SettingsScreen() {
     <section class="screen">
       <header class="screen-heading">
         <h1>設定</h1>
-        <p>タイムスタンプの送信先と、証明書の検証方針を設定します。</p>
       </header>
       <TsaPicker withTest />
       <div class="panel">
@@ -1982,9 +1913,7 @@ export function SettingsScreen() {
           />
           <span>
             JPKI テスト階層を受け入れる
-            <small>
-              テストカードの検証にのみ使います。テストカードは実在の本人のマイナンバーカードではありません。切り替えると、検証画面に表示中の結果は破棄されます（別の方針で計算した結果を残さないためです）。
-            </small>
+            <small>テストカードの検証用です。切り替えると、表示中の検証結果は消えます。</small>
           </span>
         </label>
       </div>
@@ -2045,7 +1974,7 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
       {/* A fieldset in a flex or grid context keeps its own min-content width unless told not to,
           which pushes the panel wider than the window. */}
       <fieldset class="tsa-options" disabled={busy}>
-        <legend>送信先（「なし」以外を選ぶと外部サーバへ接続します）</legend>
+        <legend>送信先</legend>
         {(
           [
             [{ kind: "none" }, "なし（既定）", "外部通信なし"],
@@ -2070,7 +1999,7 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
             checked={current.kind === "custom"}
             onChange={() => (tsa.value = { kind: "custom", url: customTsaUrl.value })}
           />
-          <span>任意のサーバ<small>送信先 URL を指定</small></span>
+          <span>任意のサーバ<small>URL を指定</small></span>
         </label>
       </fieldset>
       {current.kind === "custom" && (
@@ -2094,38 +2023,20 @@ function TsaPicker({ withTest = false }: { withTest?: boolean }) {
           />
         </label>
       )}
-      {emptyCustom && (
-        <p class="warn-box">
-          <strong>送信先が未入力です。</strong>
-          このままだとタイムスタンプは取得できません（署名自体は作成され、失われません）。
-        </p>
-      )}
-      {destination === null ? (
-        <p class="note">
-          <strong>外部へは何も送信しません。</strong>
-        </p>
-      ) : (
-        <p class="note">
-          <strong>送信先: {destination}</strong>。送るのは署名のハッシュ 32 バイトだけで、文書は送りません。
-        </p>
+      {emptyCustom && <p class="warn-box">送信先の URL を入力してください。</p>}
+      {/* The selected card already names the address; what it cannot say is how little goes there. */}
+      {destination !== null && (
+        <p class="note">送るのは署名のハッシュ 32 バイトだけで、文書は送りません。</p>
       )}
       {withTest && (
         <>
-          <div class="row">
-            <button
-              class="ghost"
-              onClick={test}
-              disabled={busy || current.kind === "none" || emptyCustom}
-            >
-              {busy ? "接続テスト中…" : "接続テスト"}
-            </button>
-          </div>
-          {current.kind === "none" && (
-            <p class="note">
-              送信先が「なし」のあいだは接続テストできません。試したい送信先を選んでください。
-            </p>
+          {current.kind !== "none" && (
+            <div class="row">
+              <button class="ghost" onClick={test} disabled={busy || emptyCustom}>
+                {busy ? "接続テスト中…" : "接続テスト"}
+              </button>
+            </div>
           )}
-          {emptyCustom && <p class="note">URL が空のあいだは接続テストできません。</p>}
           <div role="status">{probeError && <p class="error">{probeError}</p>}</div>
           {probe && (
             <div class="result">
