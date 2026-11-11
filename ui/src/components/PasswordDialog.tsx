@@ -377,7 +377,9 @@ export function PasswordDialog({
                 ref={input}
                 id="sign-password"
                 name="sign-password"
-                type={reveal ? "text" : "password"}
+                // Preact 11 types each input type as its own props shape, so a "text" | "password"
+                // value has to be spread as one of the two whole shapes rather than as a union.
+                {...(reveal ? { type: "text" as const } : { type: "password" as const })}
                 autocomplete="off"
                 autocorrect="off"
                 autocapitalize="off"

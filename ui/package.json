@@ -10,11 +10,11 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@preact/signals": "^2.11.1",
+    "@preact/signals": "^2.11.4",
     "@tauri-apps/api": "~2.12.0",
     "@tauri-apps/plugin-dialog": "~2.8.0",
     "pdfjs-dist": "^6.2.108",
-    "preact": "^10.29.8"
+    "preact": "^11.2.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
