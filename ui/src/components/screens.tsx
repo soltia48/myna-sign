@@ -130,7 +130,7 @@ const NO_SIGN_CERTIFICATE =
  * used to fall through to the green tick at the end of a ternary, which is the one reading that is
  * certainly wrong.
  */
-function retriesTone(retries: number | null): Tone {
+export function retriesTone(retries: number | null): Tone {
   if (retries === null) return "unknown";
   if (retries === 0) return "bad";
   return retries <= 2 ? "warn" : "ok";

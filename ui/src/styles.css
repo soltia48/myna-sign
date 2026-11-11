@@ -16,12 +16,26 @@
 :root {
   color-scheme: light dark;
 
-  --bg: #f6f7f9;
+  /* The palette of a Japanese public form: 墨 ink on a cool paper, with 藍 — the indigo of
+     official stamps and of the forms themselves — as the one colour that is not about a result.
+     Red stays reserved for failure; a seal-red accent was tempting and would have made every
+     primary button look like a warning in a window whose job is to say what failed. */
+  --bg: #f1f3f6;
   --surface: #ffffff;
-  --border: #d7dbe0;
-  --text: #14181d;
-  --muted: #5b6672;
-  --accent: #1f5fa9;
+  --border: #d6dbe2;
+  --text: #191d25;
+  --muted: #566070;
+  /* 8.9:1 under white text. */
+  --accent: #234a85;
+  --accent-soft: #e4eaf4;
+
+  /* The rail. Deep indigo in both themes, so the window keeps one face whatever the system says. */
+  --rail: #1f3a68;
+  --rail-ink: #f4f6fb;
+  --rail-muted: #b7c4dc;
+  --rail-line: rgb(255 255 255 / 0.16);
+  --rail-warn: #f4c86c;
+  --rail-bad: #ffb0a8;
 
   /* The foreground of a filled button. White on the dark accent is 2.46:1, which failed on the
      one button that must never be misread: the submit of the password dialog at one try left.
@@ -45,12 +59,19 @@
 
   /* Four steps. `--fs-sm` is the aside; body is 1rem; the two above it are headings. */
   --fs-sm: 0.875rem;
-  --fs-lg: 1.05rem;
-  --fs-xl: 1.4rem;
+  --fs-lg: 1.0625rem;
+  --fs-xl: 1.5rem;
+  --fs-num: 2.25rem;
+
+  /* BIZ UD is the Universal Design face Japanese municipalities set their forms in, and it ships
+     with Windows; the rest of the stack is each platform's own Japanese gothic. Nothing is fetched. */
+  --font: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+    "Noto Sans CJK JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
 
   --r-xs: 2px;
   --r-sm: 4px;
   --r-md: 8px;
+  --r-lg: 12px;
   --r-pill: 999px;
 
   --sp-1: 4px;
@@ -64,25 +85,31 @@
      underneath it. An approximation on purpose: `scroll-padding-top` takes a length, and the
      strip also carries the message banner, whose height depends on what it is saying. Erring
      shallow costs a little scrolling; there is no value that is right in both cases. */
-  --tabs-height: 68px;
+  --tabs-height: var(--sp-5);
+
+  --rail-width: 212px;
 
   /* Drawn on the page image, which is white paper in both themes, so these do not follow the
      theme: the dark accent is 2.46:1 on paper and the rectangle would be a rumour. 6.43:1 and
      5.85:1 on white respectively. */
-  --paper-ink: #1f5fa9;
+  --paper-ink: #234a85;
   --paper-muted: #5b6672;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14181d;
-    --surface: #1c2128;
-    --border: #303845;
-    --text: #e6e9ee;
-    --muted: #9aa5b1;
-    --accent: #6ea8f0;
+    --bg: #13171d;
+    --surface: #1b2029;
+    --border: #2e3644;
+    --text: #e6e9ef;
+    --muted: #9ba6b4;
+    --accent: #8fb3ec;
+    --accent-soft: #1f2b40;
 
-    --on-accent: #14181d;
+    --rail: #101c33;
+    --rail-line: rgb(255 255 255 / 0.12);
+
+    --on-accent: #13171d;
     --control-border: #7a8695;
 
     --ok: #7fd6a2;
@@ -108,7 +135,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 0.9375rem/1.6 system-ui, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  font: 0.9375rem/1.7 var(--font);
+  font-kerning: normal;
   overflow-wrap: anywhere;
 }
 
@@ -142,8 +170,19 @@ button:focus-visible {
 }
 
 button.ghost:focus-visible,
-.tab:focus-visible,
 .copy:focus-visible {
+  outline-color: var(--accent);
+}
+
+/* Drawn inside the tab: outside it, the ring would be indigo on indigo above and below, and would
+   bleed into the page on the right of the selected one. Paper ink on the rail, page ink on the
+   tab that is cut from the page. */
+.tab:focus-visible {
+  outline-color: var(--rail-ink);
+  outline-offset: -4px;
+}
+
+.tab[aria-selected="true"]:focus-visible {
   outline-color: var(--accent);
 }
 
@@ -175,65 +214,206 @@ button.ghost:focus-visible,
   }
 }
 
-/* --- Navigation --- */
+/* --- Shell --- */
 
-/* The tabs and whatever the last action had to say travel together. A banner that scrolls away
-   while the buttons that produced it stay put is a message about nothing on screen; sticking the
-   wrapper rather than the nav keeps the offset out of this file, since the strip is only ever as
-   tall as the font makes it. */
-.topbar {
+/* Two columns: the rail, which says where you are and what the card can still do, and the
+   workspace. The content inside the workspace is set flush left at a reading measure rather than
+   centred in the window, the way a form sits on its sheet. */
+.app {
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-5) 0 var(--sp-4) var(--sp-4);
+  background: var(--rail);
+  color: var(--rail-ink);
+  overflow-y: auto;
+}
+
+.workspace {
+  min-width: 0;
+  padding: 0 clamp(var(--sp-4), 4vw, var(--sp-6)) var(--sp-6);
+}
+
+.workspace > main {
+  max-width: 46rem;
+}
+
+.workspace > main:focus {
+  outline: none;
+}
+
+/* The last action's message stays over the work it is about while that work scrolls. */
+.messages {
   position: sticky;
   top: 0;
   z-index: 5;
+  max-width: 46rem;
   background: var(--bg);
+}
+
+.messages:has(.banner) {
+  padding-bottom: var(--sp-2);
+}
+
+/* --- Navigation --- */
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-inline-end: var(--sp-4);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* A square of paper with the pen on it: the one place the paper colour appears inside the rail. */
+.identity-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  background: var(--rail-ink);
+  color: var(--rail);
 }
 
 .tabs {
   display: flex;
-  gap: var(--sp-1);
-  padding: var(--sp-3) 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The selected tab is cut from the page itself and runs into it, like the index tab of a folder:
+   the screen beside it is visibly the thing it opened. */
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-3);
+  background: none;
+  border: 0;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  color: var(--rail-muted);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.tabs [role="tab"][aria-selected="true"] {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 700;
 }
 
 /* Says a run is still going after the user has left the screen that started it. Deliberately
    still: a blinking tab is a thing the eye cannot put down, and this can last a minute. */
 .tab-busy {
-  margin-left: var(--sp-1);
+  margin-inline-start: auto;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-pill);
+  border: 1px solid currentColor;
   font-size: var(--fs-sm);
-  color: var(--muted);
+  font-weight: 400;
+  line-height: 1.5;
 }
 
-.tab {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
-  padding: var(--sp-2) var(--sp-4);
-  color: var(--muted);
-  font: inherit;
-  cursor: pointer;
-  display: inline-flex;
+/* What the card can still do. Proportioned like the card (85.6 × 54 mm) so it reads as the object
+   rather than as one more box of text. */
+.rail-card {
+  margin: auto var(--sp-4) 0 0;
+  aspect-ratio: 85.6 / 54;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--sp-3);
+  border: 1px solid var(--rail-line);
+  border-radius: var(--r-lg);
+  background: rgb(255 255 255 / 0.06);
+  line-height: 1.4;
+}
+
+.rail-card-head {
+  display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--sp-2);
 }
 
-.tab.active,
-.tabs [role="tab"][aria-selected="true"] {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
+.rail-card-state {
+  margin: 0;
+  font-size: var(--fs-sm);
   font-weight: 600;
+}
+
+/* The IC contacts, in the brass they are made of. Purely a figure; the heading carries the words. */
+.rail-card-chip {
+  flex: none;
+  width: 22px;
+  height: 17px;
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, transparent 45%, rgb(0 0 0 / 0.25) 45% 55%, transparent 55%),
+    linear-gradient(transparent 30%, rgb(0 0 0 / 0.25) 30% 38%, transparent 38% 62%, rgb(0 0 0 / 0.25) 62% 70%, transparent 70%),
+    #c9ad6a;
+}
+
+.rail-card-count {
+  margin: 0;
+}
+
+.rail-card-label {
+  display: block;
+  color: var(--rail-muted);
+  font-size: var(--fs-sm);
+}
+
+.rail-card-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-card-value strong {
+  font-size: var(--fs-num);
+  line-height: 1;
+  margin-inline: 2px;
+}
+
+.rail-card[data-tone="warn"] .rail-card-value {
+  color: var(--rail-warn);
+}
+
+.rail-card[data-tone="bad"] .rail-card-value {
+  color: var(--rail-bad);
 }
 
 /* --- Chrome --- */
 
 h1 {
   font-size: var(--fs-xl);
+  font-weight: 700;
   margin: var(--sp-5) 0 var(--sp-4);
 }
 
-h1, h2 {
+/* Proportional kana in headings only: at heading size the full-width boxes leave visible gaps
+   around ー and the small kana, while body text reads better on the even grid. */
+h1, h2, .identity {
   line-height: 1.4;
   text-wrap: balance;
+  font-feature-settings: "palt";
 }
 
 h2 {
@@ -241,16 +421,10 @@ h2 {
   margin: 0 0 var(--sp-3);
 }
 
-.app {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 var(--sp-4) var(--sp-6);
-}
-
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   padding: var(--sp-5);
   margin-bottom: var(--sp-5);
 }
@@ -793,7 +967,7 @@ progress {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   padding: var(--sp-5);
   width: min(520px, 100%);
   max-height: 90vh;
@@ -1065,25 +1239,9 @@ button > .icon {
   margin: 0;
 }
 
-.identity > .icon,
+.identity-mark > .icon,
 .tab[aria-selected="true"] > .icon {
   stroke-width: 2;
-}
-
-.navigation-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  border-bottom: 1px solid var(--border);
-}
-
-.identity {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .skip-link {
@@ -1104,7 +1262,7 @@ button > .icon {
 }
 
 .screen-heading {
-  margin-block: var(--sp-5);
+  margin-block: var(--sp-6) var(--sp-5);
 }
 
 .screen-heading h1 {
@@ -1259,8 +1417,13 @@ button > .icon {
     box-shadow: inset 0 0 0 1px currentColor;
   }
 
+  .tab:not([aria-selected="true"]):hover {
+    background: rgb(255 255 255 / 0.08);
+    color: var(--rail-ink);
+    box-shadow: none;
+  }
+
   button.ghost:not(:disabled):hover,
-  .tab:not([aria-selected="true"]):hover,
   .tsa-options .check:not(:has(input:disabled)):hover {
     background: var(--bg);
     color: var(--text);
@@ -1276,25 +1439,61 @@ button:not(:disabled):active {
   box-shadow: inset 0 0 0 2px currentColor;
 }
 
+/* Tabs answer hover and press with their own fill; an outline inside a tab cut from the page would
+   read as a second selection. */
+.tab:not(:disabled):hover,
+.tab:not(:disabled):active {
+  box-shadow: none;
+}
+
 /* Three-column claims and long file actions need stacking before labels lose their measure. */
 @media (max-width: 40rem) {
-  .navigation-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
+  /* The rail folds into a strip across the top. The card summary goes: it is a repeat of the card
+     screen, and on a narrow window the space is the work's. */
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rail {
+    z-index: 6;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4) 0;
+    overflow: visible;
   }
 
   .identity {
-    padding-top: var(--sp-3);
+    font-size: 1rem;
+  }
+
+  .identity-mark {
+    width: 26px;
+    height: 26px;
   }
 
   .tabs {
+    flex-direction: row;
     width: 100%;
   }
 
   .tab {
     flex: 1 1 0;
+    justify-content: center;
+    gap: var(--sp-1);
     padding-inline: var(--sp-2);
+    border-radius: var(--r-md) var(--r-md) 0 0;
+  }
+
+  .rail-card {
+    display: none;
+  }
+
+  /* The rail now sits over the top of the page instead of beside it. */
+  .messages {
+    top: 100px;
   }
 
   :root {
